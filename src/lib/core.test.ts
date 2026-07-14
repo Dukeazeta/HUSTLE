@@ -54,6 +54,24 @@ describe("website audit", () => {
       result.every((item) => item.sourceUrl === "https://example.com/contact"),
     ).toBe(true);
   });
+  it("extracts plain public emails and structured business phone numbers", () => {
+    const result = extractPublicContacts(
+      '<p>Bookings: hello@example.com</p><script type="application/ld+json">{"telephone":"+234 801 234 5678"}</script>',
+      "https://example.com/about",
+    );
+    expect(result).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          channel: "email",
+          value: "hello@example.com",
+        }),
+        expect.objectContaining({
+          channel: "phone",
+          normalizedValue: "+2348012345678",
+        }),
+      ]),
+    );
+  });
 });
 
 describe("outreach safety", () => {

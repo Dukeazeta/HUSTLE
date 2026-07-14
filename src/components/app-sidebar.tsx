@@ -37,11 +37,17 @@ export function AppSidebar({
         </div>
       </Link>
       <nav className="app-nav">
-        <Link href="/" className={!lead && active === "command" ? "active" : ""}>
+        <Link
+          href="/"
+          className={!lead && active === "command" ? "active" : ""}
+        >
           <Radar />
           Command centre
         </Link>
-        <Link href="/campaigns" className={active === "campaigns" ? "active" : ""}>
+        <Link
+          href="/campaigns"
+          className={active === "campaigns" ? "active" : ""}
+        >
           <Target />
           Campaigns
         </Link>
@@ -49,7 +55,10 @@ export function AppSidebar({
           <BriefcaseBusiness />
           Lead pipeline
         </Link>
-        <Link href="/follow-ups" className={active === "followups" ? "active" : ""}>
+        <Link
+          href="/follow-ups"
+          className={active === "followups" ? "active" : ""}
+        >
           <CalendarClock />
           Follow-ups
         </Link>
@@ -107,13 +116,6 @@ export function AppSidebar({
           <small>{Math.max(0, 100 - (qualified ?? 0))} remaining</small>
         </div>
       )}
-      <div className="owner-block">
-        <span>N</span>
-        <div>
-          <b>Owner</b>
-          <small>Private workspace</small>
-        </div>
-      </div>
     </aside>
   );
 }

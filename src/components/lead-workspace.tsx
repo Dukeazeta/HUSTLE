@@ -506,6 +506,20 @@ export function LeadWorkspace({
                     </div>
                   </div>
                   <div className="contact-cards">
+                    {contacts.length === 0 && (
+                      <div className="contact-empty-state" role="status">
+                        <ShieldCheck />
+                        <div>
+                          <b>No public contact details found</b>
+                          <p>
+                            The audit checked the website and its public contact
+                            pages but did not find an email, phone number, or
+                            WhatsApp link. Add one manually only if you can cite
+                            its public source.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {contacts.map((contact) => (
                       <article key={contact.id}>
                         <div>
@@ -638,6 +652,14 @@ export function LeadWorkspace({
             <div className="stage-stack">
               <div className="two-panel compact-panels">
                 <InfoPanel title="Verified contact" icon={<ShieldCheck />}>
+                  {contacts.filter((item) => item.verified).length === 0 && (
+                    <p>
+                      <b>No verified contact available</b>
+                      <small>
+                        Find and verify a public business contact first.
+                      </small>
+                    </p>
+                  )}
                   {contacts
                     .filter((item) => item.verified)
                     .slice(0, 2)

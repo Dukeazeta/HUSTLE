@@ -26,6 +26,18 @@ export type WebsiteAudit = {
   contacts: DiscoveredContact[];
 };
 
+const MAX_CONTACT_PAGES = 3;
+const CONTACT_PAGE_BYTES = 750_000;
+
+function decodeHtml(value: string) {
+  return value
+    .replace(/&amp;/gi, "&")
+    .replace(/&#x2f;/gi, "/")
+    .replace(/&#47;/g, "/")
+    .replace(/&#64;|&commat;/gi, "@")
+    .replace(/&nbsp;/gi, " ");
+}
+
 function isPrivateIp(address: string) {
   if (!isIP(address)) return true;
   return (
@@ -78,22 +90,112 @@ export function extractPublicContacts(
       sourceUrl,
     });
   };
-  for (const match of html.matchAll(/mailto:([^?"'<>\s]+)/gi)) {
-    const email = decodeURIComponent(match[1]).toLowerCase();
+  const decodedHtml = decodeHtml(html);
+
+  for (const match of decodedHtml.matchAll(/mailto:([^?"'<>\s]+)/gi)) {
+    const email = decodeURIComponent(match[1])
+      .toLowerCase()
+      .replace(/[.,;:]$/, "");
     if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
       addContact("email", email, email);
   }
-  for (const match of html.matchAll(
-    /(?:wa\.me\/|api\.whatsapp\.com\/send\?phone=)(\+?\d[\d\s()-]{6,})/gi,
+
+  for (const match of decodedHtml.matchAll(
+    /(?:wa\.me\/|api\.whatsapp\.com\/(?:send\/)?\?(?:[^"'<>\s]*&)?phone=|whatsapp:\/\/send\?(?:[^"'<>\s]*&)?phone=)(\+?\d[\d\s()-]{6,})/gi,
   )) {
     const phone = normalizePhone(match[1]);
     addContact("whatsapp", match[1], phone ?? "");
   }
-  for (const match of html.matchAll(/tel:([^?"'<>]+)/gi)) {
+
+  for (const match of decodedHtml.matchAll(/tel:([^?"'<>]+)/gi)) {
     const value = decodeURIComponent(match[1]).trim();
     addContact("phone", value, normalizePhone(value) ?? "");
   }
+
+  for (const match of decodedHtml.matchAll(
+    /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
+  )) {
+    const email = match[0].toLowerCase();
+    addContact("email", email, email);
+  }
+
+  for (const match of decodedHtml.matchAll(
+    /["'](?:telephone|phone|mobile)["']\s*:\s*["']([^"']{7,30})["']/gi,
+  )) {
+    const value = match[1].trim();
+    const phone = normalizePhone(value);
+    if (phone && phone.replace(/\D/g, "").length >= 7)
+      addContact("phone", value, phone);
+  }
+
   return [...found.values()];
+}
+
+function discoverContactPageUrls(html: string, baseUrl: string) {
+  const base = new URL(baseUrl);
+  const candidates = new Map<string, URL>();
+
+  for (const match of html.matchAll(
+    /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+  )) {
+    const href = decodeHtml(match[1]).trim();
+    const label = match[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    if (
+      !/(contact|about|reach us|get in touch|find us|location)/i.test(
+        `${href} ${label}`,
+      )
+    )
+      continue;
+
+    try {
+      const candidate = new URL(href, base);
+      const candidateDomain = candidate.hostname
+        .toLowerCase()
+        .replace(/^www\./, "");
+      const baseDomain = base.hostname.toLowerCase().replace(/^www\./, "");
+      if (
+        candidateDomain !== baseDomain ||
+        !["http:", "https:"].includes(candidate.protocol)
+      )
+        continue;
+      candidate.hash = "";
+      candidates.set(candidate.href, candidate);
+    } catch {
+      // Ignore malformed links from third-party websites.
+    }
+  }
+
+  return [...candidates.values()].slice(0, MAX_CONTACT_PAGES);
+}
+
+async function fetchContactPage(url: URL, redirectsRemaining = 2) {
+  const response = await fetch(url, {
+    redirect: "manual",
+    signal: AbortSignal.timeout(6_000),
+    headers: { "User-Agent": "HustleWebsiteAudit/1.0" },
+  });
+  if (response.status >= 300 && response.status < 400) {
+    if (redirectsRemaining === 0) return null;
+    const location = response.headers.get("location");
+    if (!location) return null;
+    const redirected = new URL(location, url);
+    const originalDomain = url.hostname.toLowerCase().replace(/^www\./, "");
+    const redirectedDomain = redirected.hostname
+      .toLowerCase()
+      .replace(/^www\./, "");
+    if (originalDomain !== redirectedDomain) return null;
+    await assertPublicUrl(redirected.href);
+    return fetchContactPage(redirected, redirectsRemaining - 1);
+  }
+  const length = Number(response.headers.get("content-length") || 0);
+  const contentType = response.headers.get("content-type") ?? "";
+  if (
+    !response.ok ||
+    length > CONTACT_PAGE_BYTES ||
+    !contentType.includes("text/html")
+  )
+    return null;
+  return (await response.text()).slice(0, CONTACT_PAGE_BYTES);
 }
 
 export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
@@ -180,23 +282,12 @@ export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
       item,
     ]),
   );
-  const contactLinks = [
-    ...html.matchAll(/href=["']([^"']*(?:contact|about)[^"']*)["']/gi),
-  ]
-    .map((match) => new URL(match[1], finalUrl))
-    .filter((candidate) => candidate.hostname === new URL(finalUrl).hostname)
-    .slice(0, 2);
+  const contactLinks = discoverContactPageUrls(html, finalUrl);
   for (const contactUrl of contactLinks) {
     try {
       await assertPublicUrl(contactUrl.href);
-      const contactResponse = await fetch(contactUrl, {
-        redirect: "error",
-        signal: AbortSignal.timeout(6_000),
-        headers: { "User-Agent": "HustleWebsiteAudit/1.0" },
-      });
-      const length = Number(contactResponse.headers.get("content-length") || 0);
-      if (!contactResponse.ok || length > 750_000) continue;
-      const contactHtml = (await contactResponse.text()).slice(0, 750_000);
+      const contactHtml = await fetchContactPage(contactUrl);
+      if (!contactHtml) continue;
       for (const item of extractPublicContacts(contactHtml, contactUrl.href))
         contacts.set(`${item.channel}:${item.normalizedValue}`, item);
     } catch {
@@ -277,6 +368,15 @@ export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
       "Limited contact path",
       "No form, email link, or WhatsApp link was detected.",
       "Add a short contact form and direct messaging option.",
+    );
+  if (contacts.size === 0)
+    add(
+      findings,
+      "no_public_contact",
+      "medium",
+      "No public contact details found",
+      "The homepage and checked contact pages exposed no business email, telephone number, or WhatsApp contact.",
+      "Add a clearly visible business contact method and keep it consistent across the website.",
     );
   const score = Math.min(
     100,
