@@ -109,6 +109,11 @@ export const businesses = sqliteTable(
     complianceReviewed: integer("compliance_reviewed", { mode: "boolean" })
       .notNull()
       .default(false),
+    outreachBasis: text("outreach_basis", {
+      enum: ["corporate_b2b", "consent", "solicited_request"],
+    }),
+    outreachBasisNote: text("outreach_basis_note"),
+    outreachBasisReviewedAt: text("outreach_basis_reviewed_at"),
     stage: text("stage").notNull().default("discovered"),
     score: integer("score").notNull().default(0),
     suppressed: integer("suppressed", { mode: "boolean" })
@@ -237,9 +242,16 @@ export const outreachDrafts = sqliteTable("outreach_drafts", {
   businessId: text("business_id")
     .notNull()
     .references(() => businesses.id, { onDelete: "cascade" }),
-  channel: text("channel", { enum: ["email", "whatsapp"] }).notNull(),
+  channel: text("channel", {
+    enum: ["email", "whatsapp", "instagram", "linkedin"],
+  }).notNull(),
+  sourceVariantId: text("source_variant_id").references(
+    () => pitchVariants.id,
+    { onDelete: "set null" },
+  ),
   subject: text("subject"),
   body: text("body").notNull(),
+  feedback: text("feedback", { enum: ["up", "down"] }),
   status: text("status").notNull().default("draft"),
   sentAt: text("sent_at"),
   followUpDueAt: text("follow_up_due_at"),
@@ -247,7 +259,60 @@ export const outreachDrafts = sqliteTable("outreach_drafts", {
   followUpBody: text("follow_up_body"),
   followUpSentAt: text("follow_up_sent_at"),
   ...timestamps,
-});
+}, (t) => [uniqueIndex("outreach_source_variant_unique").on(t.sourceVariantId)]);
+
+export const pitchGenerations = sqliteTable(
+  "pitch_generations",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    requestId: text("request_id").notNull(),
+    channel: text("channel", {
+      enum: ["email", "whatsapp", "instagram", "linkedin"],
+    }).notNull(),
+    model: text("model"),
+    usedFallback: integer("used_fallback", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    styleSignals: text("style_signals", { mode: "json" }).$type<
+      Record<string, string | number | boolean | null>
+    >(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("pitch_generation_request_unique").on(
+      t.businessId,
+      t.requestId,
+    ),
+    index("pitch_generation_business_idx").on(t.businessId),
+  ],
+);
+
+export const pitchVariants = sqliteTable(
+  "pitch_variants",
+  {
+    id: text("id").primaryKey(),
+    generationId: text("generation_id")
+      .notNull()
+      .references(() => pitchGenerations.id, { onDelete: "cascade" }),
+    label: text("label", { enum: ["short", "warm", "specific"] }).notNull(),
+    subject: text("subject"),
+    body: text("body").notNull(),
+    evidenceCodes: text("evidence_codes", { mode: "json" })
+      .$type<string[]>()
+      .notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("pitch_variant_generation_label_unique").on(
+      t.generationId,
+      t.label,
+    ),
+    index("pitch_variant_generation_idx").on(t.generationId),
+  ],
+);
 
 export const activities = sqliteTable("activities", {
   id: text("id").primaryKey(),
@@ -295,6 +360,7 @@ export const suppressions = sqliteTable(
     email: text("email"),
     phone: text("phone"),
     domain: text("domain"),
+    profileUrl: text("profile_url"),
     reason: text("reason").notNull(),
     source: text("source").notNull(),
     createdAt: text("created_at")
@@ -305,6 +371,7 @@ export const suppressions = sqliteTable(
     index("suppression_email_idx").on(t.email),
     index("suppression_phone_idx").on(t.phone),
     index("suppression_domain_idx").on(t.domain),
+    index("suppression_profile_url_idx").on(t.profileUrl),
   ],
 );
 
@@ -330,7 +397,26 @@ export const businessRelations = relations(businesses, ({ one, many }) => ({
   }),
   audits: many(audits),
   drafts: many(outreachDrafts),
+  pitchGenerations: many(pitchGenerations),
   contacts: many(contacts),
   links: many(businessLinks),
   opportunity: one(opportunities),
+}));
+
+export const pitchGenerationRelations = relations(
+  pitchGenerations,
+  ({ one, many }) => ({
+    business: one(businesses, {
+      fields: [pitchGenerations.businessId],
+      references: [businesses.id],
+    }),
+    variants: many(pitchVariants),
+  }),
+);
+
+export const pitchVariantRelations = relations(pitchVariants, ({ one }) => ({
+  generation: one(pitchGenerations, {
+    fields: [pitchVariants.generationId],
+    references: [pitchGenerations.id],
+  }),
 }));

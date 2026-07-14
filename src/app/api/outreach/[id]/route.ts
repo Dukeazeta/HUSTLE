@@ -6,8 +6,9 @@ import { outreachDrafts } from "@/db/schema";
 import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
 
 const schema = z.object({
-  subject: z.string().max(200).nullable(),
-  body: z.string().min(10).max(4000),
+  subject: z.string().max(200).nullable().optional(),
+  body: z.string().min(10).max(4000).optional(),
+  feedback: z.enum(["up", "down"]).nullable().optional(),
 });
 export async function PATCH(
   request: Request,
@@ -18,12 +19,17 @@ export async function PATCH(
   try {
     const draftId = (await params).id;
     const input = schema.parse(await request.json());
+    if (!Object.keys(input).length)
+      return NextResponse.json(
+        { error: "No draft changes were provided" },
+        { status: 400 },
+      );
     const draft = await db.query.outreachDrafts.findFirst({
       where: eq(outreachDrafts.id, draftId),
     });
     if (!draft)
       return NextResponse.json({ error: "Draft not found" }, { status: 404 });
-    if (draft.sentAt)
+    if (draft.sentAt && (input.subject !== undefined || input.body !== undefined))
       return NextResponse.json(
         { error: "Sent messages cannot be edited" },
         { status: 409 },

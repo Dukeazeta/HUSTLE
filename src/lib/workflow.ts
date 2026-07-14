@@ -1,4 +1,5 @@
 import { PIPELINE_STAGES, type PipelineStage } from "./constants";
+import type { OutreachChannel } from "./constants";
 
 export const CLOSED_STAGES = new Set<PipelineStage>([
   "won",
@@ -36,7 +37,7 @@ export function canTransition(
 
 export function buildFollowUp(
   originalBody: string,
-  channel: "email" | "whatsapp",
+  channel: OutreachChannel,
 ) {
   const firstUsefulLine = originalBody
     .split("\n")

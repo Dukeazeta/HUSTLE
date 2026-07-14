@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { CalendarClock, MessageCircle, Mail } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  CalendarClock,
+  Camera,
+  MessageCircle,
+  Mail,
+} from "lucide-react";
+import type { OutreachChannel } from "@/lib/constants";
 export function FollowUpQueue({
   reminders,
 }: {
@@ -7,7 +14,7 @@ export function FollowUpQueue({
     draftId: string;
     businessId: string;
     businessName: string;
-    channel: "email" | "whatsapp";
+    channel: OutreachChannel;
     dueAt: string | null;
     body: string;
   }[];
@@ -20,6 +27,10 @@ export function FollowUpQueue({
             <span className="followup-channel">
               {item.channel === "email" ? (
                 <Mail size={15} />
+              ) : item.channel === "instagram" ? (
+                <Camera size={15} />
+              ) : item.channel === "linkedin" ? (
+                <BriefcaseBusiness size={15} />
               ) : (
                 <MessageCircle size={15} />
               )}{" "}

@@ -25,21 +25,45 @@ import {
   ShieldCheck,
   ShieldX,
   Sparkles,
+  ThumbsDown,
+  ThumbsUp,
   Users,
 } from "lucide-react";
-import { PACKAGES, PIPELINE_STAGES } from "@/lib/constants";
+import {
+  OUTREACH_CHANNELS,
+  PACKAGES,
+  PIPELINE_STAGES,
+  type OutreachChannel,
+} from "@/lib/constants";
 
 type Draft = {
   id: string;
-  channel: "email" | "whatsapp";
+  channel: OutreachChannel;
+  sourceVariantId: string | null;
   subject: string | null;
   body: string;
+  feedback: "up" | "down" | null;
   status: string;
   sentAt: string | null;
   followUpDueAt: string | null;
   followUpSubject: string | null;
   followUpBody: string | null;
   followUpSentAt: string | null;
+};
+
+type PitchGeneration = {
+  id: string;
+  channel: OutreachChannel;
+  usedFallback: boolean;
+} | null;
+
+type PitchVariant = {
+  id: string;
+  generationId: string;
+  label: "short" | "warm" | "specific";
+  subject: string | null;
+  body: string;
+  evidenceCodes: string[];
 };
 
 type Contact = {
@@ -90,6 +114,7 @@ type Activity = {
 
 type Evidence = {
   id: string;
+  code: string;
   severity: string;
   title: string;
   evidence: string;
@@ -105,6 +130,9 @@ type Lead = {
   websiteUrl: string | null;
   legalForm: "corporate" | "sole_trader" | "unknown";
   complianceReviewed: boolean;
+  outreachBasis: "corporate_b2b" | "consent" | "solicited_request" | null;
+  outreachBasisNote: string | null;
+  outreachBasisReviewedAt: string | null;
   suppressed: boolean;
   score: number;
   category: string;
@@ -146,6 +174,8 @@ export function LeadWorkspace({
   demo,
   canDraft,
   drafts: initialDrafts,
+  generation: initialGeneration,
+  variants: initialVariants,
   contacts: initialContacts,
   links: initialLinks,
   opportunity: initialOpportunity,
@@ -158,6 +188,8 @@ export function LeadWorkspace({
   demo: boolean;
   canDraft: boolean;
   drafts: Draft[];
+  generation: PitchGeneration;
+  variants: PitchVariant[];
   contacts: Contact[];
   links: BusinessLink[];
   opportunity: Opportunity;
@@ -168,6 +200,8 @@ export function LeadWorkspace({
 }) {
   const [lead, setLead] = useState(initialLead);
   const [drafts, setDrafts] = useState(initialDrafts);
+  const [generation, setGeneration] = useState(initialGeneration);
+  const [variants, setVariants] = useState(initialVariants);
   const [contacts, setContacts] = useState(initialContacts);
   const [links, setLinks] = useState(initialLinks);
   const [opportunity, setOpportunity] = useState(initialOpportunity);
@@ -217,24 +251,33 @@ export function LeadWorkspace({
     if (data) refresh(`Audit complete: ${data.audit.score}/100`);
   }
 
-  async function draft(channel: "email" | "whatsapp") {
+  async function draft(channel: OutreachChannel) {
     const data = await request(`/api/leads/${lead.id}/draft`, "POST", {
       channel,
+      requestId: crypto.randomUUID(),
     });
     if (data) {
-      setDrafts((rows) => [
-        {
-          followUpDueAt: null,
-          followUpSubject: null,
-          followUpBody: null,
-          followUpSentAt: null,
-          sentAt: null,
-          ...data.draft,
-        },
-        ...rows,
-      ]);
-      setMessage("Personal draft prepared for your review.");
+      setGeneration(data.generation);
+      setVariants(data.variants);
+      setMessage("Three pitch options are ready. Choose one to edit.");
     }
+  }
+
+  async function selectVariant(variant: PitchVariant) {
+    const data = await request(`/api/pitch-variants/${variant.id}/select`);
+    if (!data) return;
+    setDrafts((rows) => [
+      {
+        followUpDueAt: null,
+        followUpSubject: null,
+        followUpBody: null,
+        followUpSentAt: null,
+        sentAt: null,
+        ...data.draft,
+      },
+      ...rows.filter((row) => row.id !== data.draft.id),
+    ]);
+    setMessage(`${variant.label} variant selected. Edit it before sending.`);
   }
 
   async function saveDraft(item: Draft) {
@@ -248,23 +291,53 @@ export function LeadWorkspace({
     }
   }
 
-  function target(channel: Draft["channel"]) {
-    return contacts.find(
+  async function rateDraft(item: Draft, feedback: "up" | "down") {
+    const nextFeedback = item.feedback === feedback ? null : feedback;
+    const data = await request(`/api/outreach/${item.id}`, "PATCH", {
+      feedback: nextFeedback,
+    });
+    if (!data) return;
+    setDrafts((rows) =>
+      rows.map((row) =>
+        row.id === item.id ? { ...row, feedback: nextFeedback } : row,
+      ),
+    );
+    setMessage("Style feedback saved.");
+  }
+
+  function target(channel: OutreachChannel) {
+    if (channel === "email" || channel === "whatsapp")
+      return contacts.find(
+        (item) => item.verified && item.channel === channel,
+      );
+    return links.find(
       (item) =>
-        item.verified &&
-        item.channel === (channel === "email" ? "email" : "whatsapp"),
+        item.type === channel && item.verificationStatus === "confirmed",
     );
   }
 
-  function openComposer(item: Draft, followUp = false) {
-    const contact = target(item.channel);
-    if (!contact) return setMessage(`Verify a ${item.channel} contact first.`);
+  async function openComposer(item: Draft, followUp = false) {
+    const destination = target(item.channel);
+    if (!destination)
+      return setMessage(`Verify or confirm a ${item.channel} target first.`);
     const subject = followUp ? item.followUpSubject : item.subject;
     const body = followUp ? item.followUpBody : item.body;
+    if (item.channel === "instagram" || item.channel === "linkedin") {
+      if (!("url" in destination))
+        return setMessage(`Confirm a ${item.channel} profile first.`);
+      await navigator.clipboard.writeText(body ?? "");
+      window.open(destination.url, "_blank", "noopener,noreferrer");
+      setMessage(
+        `Message copied and ${item.channel} opened. Send it manually, then confirm here.`,
+      );
+      return;
+    }
+    if (!("value" in destination))
+      return setMessage(`Verify a ${item.channel} contact first.`);
     const url =
       item.channel === "email"
-        ? `mailto:${encodeURIComponent(contact.value)}?subject=${encodeURIComponent(subject ?? "")}&body=${encodeURIComponent(body ?? "")}`
-        : `https://wa.me/${contact.value.replace(/\D/g, "")}?text=${encodeURIComponent(body ?? "")}`;
+        ? `mailto:${encodeURIComponent(destination.value)}?subject=${encodeURIComponent(subject ?? "")}&body=${encodeURIComponent(body ?? "")}`
+        : `https://wa.me/${destination.value.replace(/\D/g, "")}?text=${encodeURIComponent(body ?? "")}`;
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
@@ -505,6 +578,31 @@ export function LeadWorkspace({
   }
 
   const selectedDraft = drafts[0];
+  const ukBasisReady =
+    lead.country !== "UK" ||
+    Boolean(
+      lead.outreachBasisReviewedAt &&
+        ((lead.outreachBasis === "corporate_b2b" &&
+          lead.legalForm === "corporate") ||
+          ((lead.outreachBasis === "consent" ||
+            lead.outreachBasis === "solicited_request") &&
+            lead.outreachBasisNote?.trim())),
+    );
+  const channelOptions = OUTREACH_CHANNELS.map((channel) => {
+    const destination = target(channel);
+    const reason = !canDraft
+      ? "Run an audit first"
+      : lead.suppressed
+        ? "Lead is suppressed"
+        : !ukBasisReady
+          ? "Record a valid UK outreach basis"
+          : !destination
+            ? channel === "instagram" || channel === "linkedin"
+              ? `Confirm the business-owned ${channel} profile`
+              : `Verify a ${channel} contact`
+            : null;
+    return { channel, available: !reason, reason };
+  });
 
   return (
     <div id="workflow" className="workflow-shell">
@@ -749,12 +847,66 @@ export function LeadWorkspace({
                       </small>
                     </span>
                   </label>
+                  {lead.country === "UK" && (
+                    <>
+                      <label className="field-label">
+                        Outreach basis
+                        <select
+                          value={lead.outreachBasis ?? ""}
+                          onChange={(e) =>
+                            setLead({
+                              ...lead,
+                              outreachBasis: (e.target.value || null) as Lead["outreachBasis"],
+                            })
+                          }
+                        >
+                          <option value="">Not recorded</option>
+                          <option value="corporate_b2b">
+                            Confirmed corporate B2B
+                          </option>
+                          <option value="consent">Documented consent</option>
+                          <option value="solicited_request">
+                            Solicited request
+                          </option>
+                        </select>
+                      </label>
+                      {(lead.outreachBasis === "consent" ||
+                        lead.outreachBasis === "solicited_request") && (
+                        <label className="field-label">
+                          Basis note
+                          <textarea
+                            value={lead.outreachBasisNote ?? ""}
+                            placeholder="Where and when the consent or request was recorded"
+                            onChange={(e) =>
+                              setLead({
+                                ...lead,
+                                outreachBasisNote: e.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                      )}
+                      <small>
+                        Social DMs count as electronic marketing. See the{" "}
+                        <a
+                          href="https://ico.org.uk/for-organisations/direct-marketing-and-privacy-and-electronic-communications/business-to-business-marketing/"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          ICO B2B guidance
+                        </a>
+                        .
+                      </small>
+                    </>
+                  )}
                   <button
                     className="primary-action"
                     onClick={() =>
                       updateLead({
                         legalForm: lead.legalForm,
                         complianceReviewed: lead.complianceReviewed,
+                        outreachBasis: lead.outreachBasis,
+                        outreachBasisNote: lead.outreachBasisNote,
                       })
                     }
                   >
@@ -885,9 +1037,95 @@ export function LeadWorkspace({
               </div>
               <section className="surface-panel pitch-editor">
                 <div className="panel-title">
+                  <span><Sparkles /></span>
+                  <div>
+                    <h3>Choose a pitch direction</h3>
+                    <p>
+                      Generate three evidence-backed options, then select one
+                      to edit.
+                    </p>
+                  </div>
+                  {generation && (
+                    <span className="draft-badge">
+                      {generation.usedFallback ? "Local fallback" : "Gemini"}
+                    </span>
+                  )}
+                </div>
+                <div className="pitch-channel-grid">
+                  {channelOptions.map((option) => (
+                    <button
+                      key={option.channel}
+                      disabled={!option.available || busy}
+                      title={option.reason ?? undefined}
+                      onClick={() => draft(option.channel)}
+                    >
+                      {option.channel === "email" ? (
+                        <Mail />
+                      ) : option.channel === "instagram" ? (
+                        <Camera />
+                      ) : option.channel === "linkedin" ? (
+                        <BriefcaseBusiness />
+                      ) : (
+                        <MessageCircle />
+                      )}
+                      <span>
+                        <b>
+                          {option.channel.charAt(0).toUpperCase() +
+                            option.channel.slice(1)}
+                        </b>
+                        <small>
+                          {option.reason ?? "Generate three variants"}
+                        </small>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {busy && <AiLoading />}
+                {variants.length > 0 && (
+                  <div className="pitch-variant-grid">
+                    {variants.map((variant) => (
+                      <article key={variant.id} className="pitch-variant-card">
+                        <div className="pitch-variant-heading">
+                          <span>{variant.label}</span>
+                          <small>{variant.body.length} characters</small>
+                        </div>
+                        {variant.subject && <h4>{variant.subject}</h4>}
+                        <p>{variant.body}</p>
+                        <div className="evidence-chips">
+                          {variant.evidenceCodes.map((code) => (
+                            <span key={code}>
+                              {evidence.find((item) => item.code === code)
+                                ?.title ?? code.replaceAll("_", " ")}
+                            </span>
+                          ))}
+                        </div>
+                        <button
+                          className="primary-action"
+                          disabled={Boolean(
+                            selectedDraft?.sourceVariantId === variant.id,
+                          )}
+                          onClick={() => selectVariant(variant)}
+                        >
+                          <Check />
+                          {selectedDraft?.sourceVariantId === variant.id
+                            ? "Selected"
+                            : "Use this version"}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="surface-panel pitch-editor">
+                <div className="panel-title">
                   <span>
                     {selectedDraft?.channel === "email" ? (
                       <Mail />
+                    ) : selectedDraft?.channel === "instagram" ? (
+                      <Camera />
+                    ) : selectedDraft?.channel === "linkedin" ? (
+                      <BriefcaseBusiness />
                     ) : (
                       <MessageCircle />
                     )}
@@ -895,12 +1133,12 @@ export function LeadWorkspace({
                   <div>
                     <h3>
                       {selectedDraft
-                        ? `${selectedDraft.channel} pitch`
-                        : "Create a personal pitch"}
+                        ? `Edit the ${selectedDraft.channel} pitch`
+                        : "No pitch selected yet"}
                     </h3>
                     <p>Review every word before opening the messaging app.</p>
                   </div>
-                  <span className="draft-badge">Draft</span>
+                  <span className="draft-badge">Manual send</span>
                 </div>
                 {selectedDraft ? (
                   <>
@@ -934,6 +1172,24 @@ export function LeadWorkspace({
                     <div className="editor-footer">
                       <span>{selectedDraft.body.length} characters</span>
                       <div>
+                        <button
+                          className={
+                            selectedDraft.feedback === "up" ? "active" : ""
+                          }
+                          aria-label="Good pitch"
+                          onClick={() => rateDraft(selectedDraft, "up")}
+                        >
+                          <ThumbsUp />
+                        </button>
+                        <button
+                          className={
+                            selectedDraft.feedback === "down" ? "active" : ""
+                          }
+                          aria-label="Poor pitch"
+                          onClick={() => rateDraft(selectedDraft, "down")}
+                        >
+                          <ThumbsDown />
+                        </button>
                         {!selectedDraft.sentAt && (
                           <button onClick={() => saveDraft(selectedDraft)}>
                             <Save />
@@ -953,7 +1209,10 @@ export function LeadWorkspace({
                           onClick={() => openComposer(selectedDraft)}
                         >
                           <MessageCircle />
-                          Open {selectedDraft.channel}
+                          {selectedDraft.channel === "instagram" ||
+                          selectedDraft.channel === "linkedin"
+                            ? `Copy and open ${selectedDraft.channel}`
+                            : `Open ${selectedDraft.channel}`}
                           <ChevronDown />
                         </button>
                         {!selectedDraft.sentAt && (
@@ -977,29 +1236,13 @@ export function LeadWorkspace({
                 ) : (
                   <div className="pitch-empty">
                     <MessageCircle />
-                    <h3>No pitch prepared</h3>
+                    <h3>Select one of the three variants</h3>
                     <p>
-                      Generate from verified audit evidence, then edit it
-                      yourself.
+                      The selected version becomes an editable outreach draft.
                     </p>
-                    <div>
-                      <button
-                        onClick={() => draft("whatsapp")}
-                        disabled={!canDraft}
-                      >
-                        Draft WhatsApp
-                      </button>
-                      <button
-                        onClick={() => draft("email")}
-                        disabled={!canDraft}
-                      >
-                        Draft email
-                      </button>
-                    </div>
                   </div>
                 )}
               </section>
-              <AiLoading />
             </div>
           )}
 

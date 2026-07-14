@@ -24,6 +24,17 @@ export const CATEGORIES = [
 ] as const;
 export type PipelineStage = (typeof PIPELINE_STAGES)[number];
 
+export const OUTREACH_CHANNELS = [
+  "email",
+  "whatsapp",
+  "instagram",
+  "linkedin",
+] as const;
+export type OutreachChannel = (typeof OUTREACH_CHANNELS)[number];
+
+export const PITCH_VARIANT_LABELS = ["short", "warm", "specific"] as const;
+export type PitchVariantLabel = (typeof PITCH_VARIANT_LABELS)[number];
+
 export const PACKAGES = {
   NG: [
     { name: "Landing page rescue", price: 85000, currency: "NGN" },

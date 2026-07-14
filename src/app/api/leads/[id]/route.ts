@@ -19,6 +19,11 @@ const schema = z.object({
   nextActionAt: z.string().datetime().nullable().optional(),
   legalForm: z.enum(["corporate", "sole_trader", "unknown"]).optional(),
   complianceReviewed: z.boolean().optional(),
+  outreachBasis: z
+    .enum(["corporate_b2b", "consent", "solicited_request"])
+    .nullable()
+    .optional(),
+  outreachBasisNote: z.string().max(1000).nullable().optional(),
   lostReason: z.string().max(500).nullable().optional(),
   reopen: z.boolean().default(false),
   contact: z
@@ -42,6 +47,15 @@ export async function PATCH(
   try {
     const businessId = (await params).id;
     const input = schema.parse(await request.json());
+    if (
+      (input.outreachBasis === "consent" ||
+        input.outreachBasis === "solicited_request") &&
+      !input.outreachBasisNote?.trim()
+    )
+      return NextResponse.json(
+        { error: "Document the consent or solicited request" },
+        { status: 400 },
+      );
     const business = await db.query.businesses.findFirst({
       where: eq(businesses.id, businessId),
     });
@@ -72,6 +86,14 @@ export async function PATCH(
         stage: input.stage,
         legalForm: input.legalForm,
         complianceReviewed: input.complianceReviewed,
+        outreachBasis: input.outreachBasis,
+        outreachBasisNote: input.outreachBasisNote,
+        outreachBasisReviewedAt:
+          input.outreachBasis === undefined
+            ? undefined
+            : input.outreachBasis
+              ? now
+              : null,
         lostReason: input.lostReason,
         updatedAt: now,
       };

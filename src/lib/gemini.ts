@@ -1,6 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import type { AuditFinding } from "./audit";
+import type { OutreachChannel } from "./constants";
+import {
+  sanitizePitchEvidence,
+  type PitchEvidence,
+  type PitchStyleSignals,
+  type PitchVariantParts,
+} from "./pitch-generation";
 
 const analysisSchema = z.object({
   summary: z.string().max(500),
@@ -23,6 +30,128 @@ const naturalDraftSchema = z.object({
 
 const aiTells =
   /[—–]|\b(additionally|crucial|delve|enhance|highlight|pivotal|showcase|valuable|vibrant|at its core|the real question|here'?s the thing|let'?s dive|game[- ]changer)\b/i;
+
+const pitchVariantSchema = z.object({
+  variants: z
+    .array(
+      z.object({
+        label: z.enum(["short", "warm", "specific"]),
+        subject: z.string().max(59).nullable(),
+        observation: z.string().min(20).max(300),
+        cta: z.string().min(20).max(180),
+        evidenceCodes: z.array(z.string()).min(1).max(2),
+      }),
+    )
+    .length(3),
+});
+
+export function buildPitchPrompt(input: {
+  category: string;
+  country: string;
+  channel: OutreachChannel;
+  evidence: PitchEvidence[];
+  styleSignals: PitchStyleSignals;
+  repairReason?: string;
+}) {
+  const safeCategories = new Set([
+    "restaurant",
+    "hotel",
+    "salon",
+    "spa",
+    "caterer",
+    "event_venue",
+    "beauty",
+  ]);
+  const category = safeCategories.has(input.category)
+    ? input.category.replaceAll("_", " ")
+    : "local business";
+  const country = input.country === "NG" ? "Nigeria" : "the UK";
+  const repair = input.repairReason
+    ? `\nThe previous response was rejected for this reason: ${input.repairReason}. Correct it without adding new facts.`
+    : "";
+
+  return `Write three distinct first-contact ${input.channel} pitch variants for an anonymous ${category} in ${country}. Use only the anonymized evidence below.
+
+Evidence: ${JSON.stringify(sanitizePitchEvidence(input.evidence))}
+Aggregate style signals from earlier outreach: ${JSON.stringify(input.styleSignals)}
+
+Return exactly Short, Warm, and Specific variants in structured JSON.
+- Short is the most compact. Warm is considerate without fake praise or familiarity. Specific leads with the strongest concrete issue and may mention one supporting issue.
+- Each variant must cite one primary evidence code and at most one supporting code from the supplied evidence.
+- observation states only what the audit directly established. Never invent benefits, customer behaviour, revenue, sales, prices, results, or compliments.
+- CTA must be one short permission-based question asking whether you may send or share a brief fix plan or homepage idea. Do not ask for a call.
+- The first message must not mention deposits, payment terms, previews, discounts, or pricing.
+- Use plain natural language, contractions where useful, and normal punctuation. No slang, emojis, hype, em dashes, agency language, or AI phrases.
+- Never include a business name, person name, address, location, URL, email address, phone number, profile handle, or contact detail.
+- Email subjects must describe the primary issue and be under 60 characters. For every other channel, subject must be null.
+- Use aggregate signals only as light style guidance. Do not recreate any earlier message.${repair}`;
+}
+
+export async function generatePitchVariantParts(input: {
+  category: string;
+  country: string;
+  channel: OutreachChannel;
+  evidence: PitchEvidence[];
+  styleSignals: PitchStyleSignals;
+  repairReason?: string;
+}) {
+  if (!process.env.GEMINI_API_KEY) throw new Error("Gemini API key is missing");
+  const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const response = await client.models.generateContent({
+    model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+    contents: buildPitchPrompt(input),
+    config: {
+      responseMimeType: "application/json",
+      responseJsonSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["variants"],
+        properties: {
+          variants: {
+            type: "array",
+            minItems: 3,
+            maxItems: 3,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: [
+                "label",
+                "subject",
+                "observation",
+                "cta",
+                "evidenceCodes",
+              ],
+              properties: {
+                label: {
+                  type: "string",
+                  enum: ["short", "warm", "specific"],
+                },
+                subject: { type: "string", nullable: true, maxLength: 59 },
+                observation: {
+                  type: "string",
+                  minLength: 20,
+                  maxLength: 300,
+                },
+                cta: { type: "string", minLength: 20, maxLength: 180 },
+                evidenceCodes: {
+                  type: "array",
+                  minItems: 1,
+                  maxItems: 2,
+                  items: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  const parsed = pitchVariantSchema.parse(JSON.parse(response.text ?? "{}"));
+  return {
+    variants: parsed.variants as PitchVariantParts[],
+    usage: response.usageMetadata,
+  };
+}
 
 export async function draftNaturalPitch(input: {
   category: string;

@@ -10,6 +10,8 @@ import {
   findings,
   opportunities,
   outreachDrafts,
+  pitchGenerations,
+  pitchVariants,
   proposals,
 } from "@/db/schema";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -45,6 +47,7 @@ export default async function LeadPage({
         ? [
             {
               id: "demo-f1",
+              code: "missing_website",
               severity: "high",
               title: "No business website",
               evidence: "The public business listing has no website URL.",
@@ -59,6 +62,19 @@ export default async function LeadPage({
         .where(eq(outreachDrafts.businessId, leadId))
         .orderBy(desc(outreachDrafts.createdAt))
     : [];
+  const latestGeneration = configured
+    ? ((await db.query.pitchGenerations.findFirst({
+        where: eq(pitchGenerations.businessId, leadId),
+        orderBy: [desc(pitchGenerations.createdAt)],
+      })) ?? null)
+    : null;
+  const generationVariants =
+    configured && latestGeneration
+      ? await db
+          .select()
+          .from(pitchVariants)
+          .where(eq(pitchVariants.generationId, latestGeneration.id))
+      : [];
   const contactRows = configured
     ? await db.select().from(contacts).where(eq(contacts.businessId, leadId))
     : [];
@@ -101,6 +117,9 @@ export default async function LeadPage({
     websiteUrl: lead.websiteUrl ?? null,
     legalForm: liveLead?.legalForm ?? "unknown",
     complianceReviewed: liveLead?.complianceReviewed ?? false,
+    outreachBasis: liveLead?.outreachBasis ?? null,
+    outreachBasisNote: liveLead?.outreachBasisNote ?? null,
+    outreachBasisReviewedAt: liveLead?.outreachBasisReviewedAt ?? null,
     suppressed: lead.suppressed,
   };
   return (
@@ -118,8 +137,10 @@ export default async function LeadPage({
       <LeadWorkspace
         lead={workspaceLead as Parameters<typeof LeadWorkspace>[0]["lead"]}
         demo={!configured}
-        canDraft={Boolean(audit && evidence.length && !lead.suppressed)}
+        canDraft={Boolean(audit && !lead.suppressed)}
         drafts={drafts as Parameters<typeof LeadWorkspace>[0]["drafts"]}
+        generation={latestGeneration}
+        variants={generationVariants}
         contacts={
           contactRows as Parameters<typeof LeadWorkspace>[0]["contacts"]
         }

@@ -1347,6 +1347,14 @@ button {
   font-size: 10px;
   font-weight: 650;
 }
+.field-label textarea {
+  min-height: 88px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  resize: vertical;
+  font: inherit;
+}
 .review-check {
   display: flex;
   align-items: flex-start;
@@ -1411,6 +1419,132 @@ button {
   font-size: 8px;
   text-transform: uppercase;
 }
+.pitch-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+.pitch-channel-grid > button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 62px;
+  padding: 10px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fbfcfb;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.pitch-channel-grid > button:not(:disabled):hover {
+  transform: translateY(-2px);
+  border-color: #87ad9b;
+  box-shadow: 0 8px 22px #173d2e12;
+}
+.pitch-channel-grid > button:disabled {
+  opacity: 0.58;
+}
+.pitch-channel-grid svg {
+  width: 17px;
+  color: var(--green);
+}
+.pitch-channel-grid span {
+  display: grid;
+  min-width: 0;
+}
+.pitch-channel-grid b {
+  font-size: 10px;
+}
+.pitch-channel-grid small {
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pitch-variant-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+.pitch-variant-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 330px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+  animation: pitch-card-in 220ms ease both;
+}
+.pitch-variant-card:nth-child(2) {
+  animation-delay: 45ms;
+}
+.pitch-variant-card:nth-child(3) {
+  animation-delay: 90ms;
+}
+.pitch-variant-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pitch-variant-heading span {
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.pitch-variant-heading small {
+  color: var(--muted);
+  font-size: 8px;
+}
+.pitch-variant-card h4 {
+  margin: 12px 0 0;
+  font-size: 11px;
+}
+.pitch-variant-card > p {
+  flex: 1;
+  margin: 13px 0;
+  color: #33413b;
+  font-size: 10px;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+.pitch-variant-card > button {
+  justify-content: center;
+  margin-top: 12px;
+}
+.pitch-variant-card > button svg {
+  width: 13px;
+}
+@keyframes pitch-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 900px) {
+  .pitch-channel-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pitch-variant-grid {
+    grid-template-columns: 1fr;
+  }
+  .pitch-variant-card {
+    min-height: 0;
+  }
+}
 .pitch-editor > textarea {
   width: 100%;
   min-height: 250px;
@@ -1450,6 +1584,11 @@ button {
 }
 .editor-footer svg {
   width: 13px;
+}
+.editor-footer button.active {
+  color: var(--green);
+  border-color: #79a48f;
+  background: #e9f3ee;
 }
 .pitch-empty {
   text-align: center;

@@ -9,8 +9,10 @@ A private, human-approved lead discovery and outreach workspace for finding hosp
 - Single-owner Google authentication through Auth.js
 - SSRF-safe website auditing, deterministic opportunity scoring, and stored evidence
 - Capped Gemini 2.5 Flash analysis using anonymized, schema-validated input/output
-- Email and WhatsApp drafts that never send automatically
-- Permanent opt-out suppression and UK compliance review gate
+- Three evidence-backed Short, Warm, and Specific pitch variants per generation
+- Manual email, WhatsApp, Instagram, and LinkedIn outreach that never sends automatically
+- Aggregate style learning without sending historical messages or business data to Gemini
+- Permanent opt-out suppression and a recorded UK outreach-basis gate
 - One five-business-day follow-up reminder
 - Proposal, staging-preview approval, payment, and handover-unlock states
 - Responsive private dashboard plus read-only demo mode
@@ -56,7 +58,10 @@ pnpm build
 ## Operating rules
 
 - Inspect and edit every pitch before sending it yourself.
-- Mark a draft sent only after using your real email or WhatsApp account.
+- Choose a channel, compare all three variants, select one, and edit it yourself.
+- Email and WhatsApp open prefilled composers. Social messages are copied before the confirmed business profile opens.
+- Mark a draft sent only after using the real messaging account.
 - Honor objections immediately; suppression is permanent.
-- For UK leads, confirm corporate status or complete manual compliance review.
+- For UK leads, record confirmed corporate B2B status, documented consent, or a solicited request before drafting.
+- Initial outreach asks permission to send a brief idea. No-deposit and preview terms are introduced only after a reply.
 - Customers inspect a restricted staging preview without a deposit. Production deployment, source code, credentials, and ownership transfer only after full payment.

@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/db";
-import { activities, businesses, outreachDrafts } from "@/db/schema";
+import {
+  activities,
+  businessLinks,
+  businesses,
+  contacts,
+  outreachDrafts,
+} from "@/db/schema";
 import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
 import { id } from "@/lib/ids";
+import { ukOutreachBlockReason } from "@/lib/outreach-compliance";
 
 export async function POST(
   _: Request,
@@ -31,15 +38,44 @@ export async function POST(
         { error: "Follow-up is unavailable" },
         { status: 409 },
       );
+    const complianceError = ukOutreachBlockReason(business);
+    if (complianceError)
+      return NextResponse.json({ error: complianceError }, { status: 409 });
+    const target =
+      draft.channel === "email" || draft.channel === "whatsapp"
+        ? await db.query.contacts.findFirst({
+            where: and(
+              eq(contacts.businessId, draft.businessId),
+              eq(contacts.channel, draft.channel),
+              eq(contacts.verified, true),
+            ),
+          })
+        : await db.query.businessLinks.findFirst({
+            where: and(
+              eq(businessLinks.businessId, draft.businessId),
+              eq(businessLinks.type, draft.channel),
+              eq(businessLinks.verificationStatus, "confirmed"),
+            ),
+          });
+    if (!target)
+      return NextResponse.json(
+        { error: `${draft.channel} target is no longer verified` },
+        { status: 409 },
+      );
     const now = new Date().toISOString();
     await db.transaction(async (tx) => {
-      await tx
+      const updated = await tx
         .update(outreachDrafts)
         .set({ followUpSentAt: now, followUpDueAt: null, updatedAt: now })
-        .where(eq(outreachDrafts.id, draftId));
-      await tx
-        .insert(activities)
-        .values({
+        .where(
+          and(
+            eq(outreachDrafts.id, draftId),
+            isNull(outreachDrafts.followUpSentAt),
+          ),
+        )
+        .returning({ id: outreachDrafts.id });
+      if (updated.length)
+        await tx.insert(activities).values({
           id: id("act"),
           businessId: draft.businessId,
           type: "follow_up_sent",

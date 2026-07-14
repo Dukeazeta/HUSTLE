@@ -13,6 +13,15 @@ import {
   extractPublicBusinessLinks,
 } from "./web-enrichment";
 import { withDatabaseRetry } from "./db-retry";
+import { buildPitchPrompt } from "./gemini";
+import { ukOutreachBlockReason } from "./outreach-compliance";
+import { aggregatePitchStyleSignals } from "./pitch-learning";
+import {
+  buildFallbackPitchParts,
+  rankPitchEvidence,
+  renderPitchVariants,
+  validatePitchParts,
+} from "./pitch-generation";
 import {
   buildFollowUp,
   canTransition,
@@ -202,5 +211,135 @@ describe("outreach safety", () => {
     expect(preserveStageAfterAudit("contacted", 20)).toBe("contacted");
     expect(canTransition("won", "qualified")).toBe(false);
     expect(canTransition("won", "qualified", true)).toBe(true);
+  });
+});
+
+describe("pitch generation upgrade", () => {
+  const missingWebsite = {
+    code: "missing_website",
+    severity: "high" as const,
+    title: "No business website",
+    evidence: "The public business listing has no website URL.",
+  };
+  const noContact = {
+    code: "weak_contact",
+    severity: "medium" as const,
+    title: "Limited contact path",
+    evidence: "No form, email link, or WhatsApp link was detected.",
+  };
+
+  it.each(["email", "whatsapp", "instagram", "linkedin"] as const)(
+    "builds three distinct and bounded %s fallbacks",
+    (channel) => {
+      const evidence = rankPitchEvidence(
+        [noContact, missingWebsite],
+        "missing",
+      );
+      const variants = renderPitchVariants({
+        businessName: "Example Salon",
+        senderName: "Duke",
+        channel,
+        variants: buildFallbackPitchParts(evidence, channel),
+        validEvidenceCodes: new Set(evidence.map((item) => item.code)),
+      });
+      expect(variants.map((item) => item.label)).toEqual([
+        "short",
+        "warm",
+        "specific",
+      ]);
+      expect(new Set(variants.map((item) => item.body)).size).toBe(3);
+      expect(variants.every((item) => item.body.includes("I won't follow up"))).toBe(
+        true,
+      );
+      if (channel === "email")
+        expect(variants.every((item) => (item.subject?.length ?? 60) < 60)).toBe(
+          true,
+        );
+      else expect(variants.every((item) => item.subject === null)).toBe(true);
+    },
+  );
+
+  it("never claims a missing website was reviewed", () => {
+    const variants = buildFallbackPitchParts([missingWebsite], "whatsapp");
+    expect(variants[0].observation).toContain("couldn't find a website");
+    expect(variants[0].observation).not.toMatch(/reviewed|checked the website/i);
+  });
+
+  it("rejects unsupported claims and evidence codes", () => {
+    expect(() =>
+      validatePitchParts(
+        [
+          {
+            label: "short",
+            subject: null,
+            observation: "This will increase your sales and bookings.",
+            cta: "Would you like me to send a brief fix plan?",
+            evidenceCodes: ["invented"],
+          },
+          ...buildFallbackPitchParts([missingWebsite], "whatsapp").slice(1),
+        ],
+        "whatsapp",
+        new Set(["missing_website"]),
+      ),
+    ).toThrow();
+  });
+
+  it("removes contact data from Gemini prompts", () => {
+    const prompt = buildPitchPrompt({
+      category: "Acme Salon +2348012345678",
+      country: "NG",
+      channel: "instagram",
+      evidence: [
+        {
+          ...missingWebsite,
+          evidence:
+            "See https://acme.example or owner@acme.example and +234 801 234 5678.",
+        },
+      ],
+      styleSignals: aggregatePitchStyleSignals([]),
+    });
+    expect(prompt).not.toContain("Acme Salon");
+    expect(prompt).not.toContain("https://acme.example");
+    expect(prompt).not.toContain("owner@acme.example");
+    expect(prompt).not.toContain("+234 801 234 5678");
+  });
+
+  it("learns only aggregate style measurements", () => {
+    const signals = aggregatePitchStyleSignals([
+      {
+        label: "warm",
+        originalBody: "Hi,\n\nWould you like me to send a brief fix plan?",
+        finalBody: "Hi Ada,\n\nMay I send a short fix plan?",
+        feedback: "up",
+      },
+    ]);
+    expect(signals).toMatchObject({
+      sampleSize: 1,
+      preferredVariant: "warm",
+      prefersNamedGreeting: true,
+      positiveFeedbackRate: 1,
+    });
+    expect(JSON.stringify(signals)).not.toContain("Ada");
+  });
+
+  it("blocks UK outreach until a valid basis is recorded", () => {
+    expect(
+      ukOutreachBlockReason({
+        country: "UK",
+        legalForm: "unknown",
+        outreachBasis: null,
+        outreachBasisNote: null,
+        outreachBasisReviewedAt: null,
+      }),
+    ).toContain("basis");
+    expect(
+      ukOutreachBlockReason({
+        country: "UK",
+        legalForm: "sole_trader",
+        outreachBasis: "consent",
+        outreachBasisNote: "Consent recorded in the enquiry email",
+        outreachBasisReviewedAt: "2026-07-14T12:00:00Z",
+      }),
+    ).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import {
   activities,
+  businessLinks,
   businesses,
   outreachDrafts,
   suppressions,
@@ -34,35 +35,51 @@ export async function POST(
     });
     if (!business)
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
-    await db
-      .insert(suppressions)
-      .values({
-        id: id("sup"),
-        email: business.email,
-        phone: business.phone,
-        domain: business.normalizedDomain,
-        reason,
-        source: "direct_objection",
+    const socialProfiles = await db
+      .select({ normalizedUrl: businessLinks.normalizedUrl })
+      .from(businessLinks)
+      .where(eq(businessLinks.businessId, businessId));
+    const now = new Date().toISOString();
+    await db.transaction(async (tx) => {
+      await tx.insert(suppressions).values([
+        {
+          id: id("sup"),
+          email: business.email,
+          phone: business.phone,
+          domain: business.normalizedDomain,
+          reason,
+          source: "direct_objection",
+        },
+        ...socialProfiles.map((profile) => ({
+          id: id("sup"),
+          profileUrl: profile.normalizedUrl,
+          reason,
+          source: "direct_objection",
+        })),
+      ]);
+      await tx
+        .update(businesses)
+        .set({
+          suppressed: true,
+          stage: "do_not_contact",
+          updatedAt: now,
+        })
+        .where(eq(businesses.id, businessId));
+      await tx
+        .update(outreachDrafts)
+        .set({
+          followUpDueAt: null,
+          status: "cancelled",
+          updatedAt: now,
+        })
+        .where(eq(outreachDrafts.businessId, businessId));
+      await tx.insert(activities).values({
+        id: id("act"),
+        businessId,
+        type: "opt_out",
+        detail: reason,
       });
-    await db
-      .update(businesses)
-      .set({
-        suppressed: true,
-        stage: "do_not_contact",
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(businesses.id, businessId));
-    await db
-      .update(outreachDrafts)
-      .set({
-        followUpDueAt: null,
-        status: "cancelled",
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(outreachDrafts.businessId, businessId));
-    await db
-      .insert(activities)
-      .values({ id: id("act"), businessId, type: "opt_out", detail: reason });
+    });
     return NextResponse.json({ suppressed: true });
   } catch (error) {
     return apiError(error);
