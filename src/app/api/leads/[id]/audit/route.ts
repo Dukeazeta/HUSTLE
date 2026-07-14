@@ -12,7 +12,8 @@ import {
 import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
 import { auditWebsite } from "@/lib/audit";
 import { analyzeFindings } from "@/lib/gemini";
-import { id } from "@/lib/ids";
+import { id, normalizeDomain, normalizePhone } from "@/lib/ids";
+import { getPlaceDetails, preferredPlacePhone } from "@/lib/places";
 import { preserveStageAfterAudit } from "@/lib/workflow";
 
 export async function POST(
@@ -28,7 +29,51 @@ export async function POST(
     });
     if (!business)
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
-    const result = await auditWebsite(business.websiteUrl);
+    let listingDetails: Awaited<ReturnType<typeof getPlaceDetails>> = null;
+    if (business.placeId && (!business.phone || !business.websiteUrl)) {
+      try {
+        listingDetails = await getPlaceDetails(business.placeId);
+      } catch (detailsError) {
+        console.warn(
+          "Google listing enrichment failed; continuing audit",
+          detailsError,
+        );
+      }
+    }
+    const listingPhone =
+      business.phone ??
+      (listingDetails ? preferredPlacePhone(listingDetails) : null);
+    const websiteUrl = business.websiteUrl ?? listingDetails?.websiteUri;
+    const sourceUrl =
+      listingDetails?.googleMapsUri ??
+      business.sourceUrl ??
+      `https://www.google.com/maps/search/?api=1&query_place_id=${business.placeId}`;
+    const result = await auditWebsite(websiteUrl);
+    if (listingPhone) {
+      const normalizedListingPhone = normalizePhone(listingPhone)!;
+      if (
+        !result.contacts.some(
+          (contact) => contact.normalizedValue === normalizedListingPhone,
+        )
+      )
+        result.contacts.unshift({
+          channel: "phone",
+          value: listingPhone,
+          normalizedValue: normalizedListingPhone,
+          sourceUrl,
+        });
+      if (
+        result.findings.some((finding) => finding.code === "no_public_contact")
+      ) {
+        result.findings = result.findings.filter(
+          (finding) => finding.code !== "no_public_contact",
+        );
+        result.score = Math.max(0, result.score - 12);
+        result.summary = result.findings.length
+          ? `${result.findings.length} evidence-backed website opportunities were found.`
+          : "No strong website-rescue opportunity was detected.";
+      }
+    }
     let summary = result.summary;
     let aiUsed = false;
     let aiResult = null;
@@ -51,16 +96,14 @@ export async function POST(
           aiResult = generated.analysis;
           summary = generated.analysis.summary;
           aiUsed = true;
-          await db
-            .insert(aiUsage)
-            .values({
-              id: id("ai"),
-              businessId,
-              model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
-              purpose: "audit",
-              inputTokens: generated.usage?.promptTokenCount ?? 0,
-              outputTokens: generated.usage?.candidatesTokenCount ?? 0,
-            });
+          await db.insert(aiUsage).values({
+            id: id("ai"),
+            businessId,
+            model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+            purpose: "audit",
+            inputTokens: generated.usage?.promptTokenCount ?? 0,
+            outputTokens: generated.usage?.candidatesTokenCount ?? 0,
+          });
         } catch (aiError) {
           console.warn(
             "Gemini audit enrichment rejected; using deterministic audit",
@@ -72,29 +115,25 @@ export async function POST(
     const auditId = id("aud");
     const stage = preserveStageAfterAudit(business.stage, result.score);
     await db.transaction(async (tx) => {
-      await tx
-        .insert(audits)
-        .values({
-          id: auditId,
-          businessId,
-          status: result.status,
-          httpStatus: result.httpStatus,
-          responseMs: result.responseMs,
-          pageBytes: result.pageBytes,
-          score: result.score,
-          summary,
-          aiUsed,
-        });
+      await tx.insert(audits).values({
+        id: auditId,
+        businessId,
+        status: result.status,
+        httpStatus: result.httpStatus,
+        responseMs: result.responseMs,
+        pageBytes: result.pageBytes,
+        score: result.score,
+        summary,
+        aiUsed,
+      });
       if (result.findings.length)
-        await tx
-          .insert(findings)
-          .values(
-            result.findings.map((item) => ({
-              id: id("fnd"),
-              auditId,
-              ...item,
-            })),
-          );
+        await tx.insert(findings).values(
+          result.findings.map((item) => ({
+            id: id("fnd"),
+            auditId,
+            ...item,
+          })),
+        );
       for (const contact of result.contacts)
         await tx
           .insert(contacts)
@@ -110,6 +149,10 @@ export async function POST(
         .set({
           score: result.score,
           stage,
+          phone: normalizePhone(listingPhone) ?? business.phone,
+          websiteUrl: websiteUrl ?? business.websiteUrl,
+          normalizedDomain:
+            normalizeDomain(websiteUrl) ?? business.normalizedDomain,
           updatedAt: new Date().toISOString(),
         })
         .where(eq(businesses.id, businessId));

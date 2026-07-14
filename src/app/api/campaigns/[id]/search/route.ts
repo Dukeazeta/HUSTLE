@@ -4,7 +4,7 @@ import { db, isDatabaseConfigured } from "@/db";
 import { businesses, campaigns, contacts } from "@/db/schema";
 import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
 import { id, normalizeDomain, normalizePhone } from "@/lib/ids";
-import { searchPlaces } from "@/lib/places";
+import { preferredPlacePhone, searchPlaces } from "@/lib/places";
 
 export async function POST(
   _: Request,
@@ -41,6 +41,10 @@ export async function POST(
     });
     let imported = 0;
     for (const place of places) {
+      const sourceUrl =
+        place.googleMapsUri ??
+        `https://www.google.com/maps/search/?api=1&query_place_id=${place.id}`;
+      const phone = preferredPlacePhone(place);
       const result = await db
         .insert(businesses)
         .values({
@@ -54,26 +58,47 @@ export async function POST(
           address: place.formattedAddress,
           websiteUrl: place.websiteUri,
           normalizedDomain: normalizeDomain(place.websiteUri),
-          phone: normalizePhone(place.nationalPhoneNumber),
-          sourceUrl:
-            place.googleMapsUri ??
-            `https://www.google.com/maps/search/?api=1&query_place_id=${place.id}`,
+          phone: normalizePhone(phone),
+          sourceUrl,
           sourceDiscoveredAt: new Date().toISOString(),
         })
         .onConflictDoNothing({ target: businesses.placeId })
         .returning({ id: businesses.id });
-      if (result[0] && place.nationalPhoneNumber)
+
+      const businessId =
+        result[0]?.id ??
+        (
+          await db.query.businesses.findFirst({
+            columns: { id: true },
+            where: eq(businesses.placeId, place.id),
+          })
+        )?.id;
+
+      if (businessId)
+        await db
+          .update(businesses)
+          .set({
+            address: place.formattedAddress,
+            websiteUrl: place.websiteUri,
+            normalizedDomain: place.websiteUri
+              ? normalizeDomain(place.websiteUri)
+              : undefined,
+            phone: phone ? normalizePhone(phone) : undefined,
+            sourceUrl,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(businesses.id, businessId));
+
+      if (businessId && phone)
         await db
           .insert(contacts)
           .values({
             id: id("con"),
-            businessId: result[0].id,
+            businessId,
             channel: "phone",
-            value: place.nationalPhoneNumber,
-            normalizedValue: normalizePhone(place.nationalPhoneNumber)!,
-            sourceUrl:
-              place.googleMapsUri ??
-              `https://www.google.com/maps/search/?api=1&query_place_id=${place.id}`,
+            value: phone,
+            normalizedValue: normalizePhone(phone)!,
+            sourceUrl,
             discoveredAt: new Date().toISOString(),
           })
           .onConflictDoNothing();

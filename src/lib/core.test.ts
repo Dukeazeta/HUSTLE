@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { auditWebsite, extractPublicContacts } from "./audit";
 import { addBusinessDays, buildPitch } from "./drafts";
 import { normalizeDomain, normalizePhone } from "./ids";
+import { preferredPlacePhone } from "./places";
 import { withDatabaseRetry } from "./db-retry";
 import {
   buildFollowUp,
@@ -13,6 +14,14 @@ describe("lead normalization", () => {
   it("normalizes domains and phone numbers for deduplication", () => {
     expect(normalizeDomain("https://www.Example.com/menu")).toBe("example.com");
     expect(normalizePhone("+234 (801) 234-5678")).toBe("+2348012345678");
+  });
+  it("prefers the international Google listing phone number", () => {
+    expect(
+      preferredPlacePhone({
+        nationalPhoneNumber: "0801 234 5678",
+        internationalPhoneNumber: "+234 801 234 5678",
+      }),
+    ).toBe("+234 801 234 5678");
   });
 });
 
