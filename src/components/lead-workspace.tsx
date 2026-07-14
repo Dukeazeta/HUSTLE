@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowUpRight,
   AtSign,
@@ -28,6 +28,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   Users,
+  X,
 } from "lucide-react";
 import {
   OUTREACH_CHANNELS,
@@ -209,6 +210,7 @@ export function LeadWorkspace({
     initialWorkflow(initialLead.stage),
   );
   const [message, setMessage] = useState("");
+  const [messageClosing, setMessageClosing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [checkedWhatsAppContact, setCheckedWhatsAppContact] = useState("");
   const [contactForm, setContactForm] = useState({
@@ -216,6 +218,29 @@ export function LeadWorkspace({
     value: "",
     sourceUrl: lead.websiteUrl ?? lead.sourceUrl,
   });
+
+  useEffect(() => {
+    if (!message) return;
+    const revealMessage = window.setTimeout(
+      () => setMessageClosing(false),
+      0,
+    );
+    const startClosing = window.setTimeout(
+      () => setMessageClosing(true),
+      5_800,
+    );
+    const clearMessage = window.setTimeout(() => setMessage(""), 6_000);
+    return () => {
+      window.clearTimeout(revealMessage);
+      window.clearTimeout(startClosing);
+      window.clearTimeout(clearMessage);
+    };
+  }, [message]);
+
+  function dismissMessage() {
+    setMessageClosing(true);
+    window.setTimeout(() => setMessage(""), 180);
+  }
 
   async function request(path: string, method = "POST", body: object = {}) {
     if (demo) {
@@ -626,9 +651,20 @@ export function LeadWorkspace({
       </div>
 
       {message && (
-        <div className="workflow-toast">
+        <div
+          className={`workflow-toast ${messageClosing ? "closing" : ""}`}
+          role="status"
+          aria-live="polite"
+        >
           {busy ? <LoaderCircle className="spin" /> : <CheckCircle2 />}
-          {message}
+          <span>{message}</span>
+          <button
+            type="button"
+            aria-label="Close notification"
+            onClick={dismissMessage}
+          >
+            <X />
+          </button>
         </div>
       )}
 

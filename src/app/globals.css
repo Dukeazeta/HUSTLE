@@ -952,10 +952,39 @@ button {
   border-radius: 9px;
   box-shadow: 0 12px 28px #10251d30;
   animation: toast-in 0.25s ease both;
+  max-width: min(620px, calc(100vw - 32px));
 }
-.workflow-toast svg {
+.workflow-toast > svg {
   width: 16px;
+  flex: 0 0 auto;
   color: var(--lime);
+}
+.workflow-toast > span {
+  min-width: 0;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.workflow-toast > button {
+  display: grid;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  margin-left: 4px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: #ffffff14;
+  color: white;
+}
+.workflow-toast > button:hover {
+  background: #ffffff24;
+}
+.workflow-toast > button svg {
+  width: 13px;
+}
+.workflow-toast.closing {
+  animation: toast-out 0.2s ease both;
 }
 .spin {
   animation: spin 1s linear infinite;
@@ -2005,6 +2034,16 @@ button {
   to {
     opacity: 1;
     transform: translate(-50%, 0);
+  }
+}
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -12px);
   }
 }
 @keyframes modal-in {

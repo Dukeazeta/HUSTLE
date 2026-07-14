@@ -37,6 +37,15 @@ const searchResponseSchema = z.object({
     .optional(),
 });
 
+const searchErrorSchema = z.object({
+  error: z
+    .object({
+      code: z.string().optional(),
+      detail: z.string().optional(),
+    })
+    .optional(),
+});
+
 const directoryDomains = new Set([
   "google.com",
   "tripadvisor.com",
@@ -195,23 +204,21 @@ export async function searchPublicBusinessPresence(input: {
   city: string;
   country: string;
 }) {
-  const key = process.env.BRAVE_SEARCH_API_KEY;
+  const key = process.env.BRAVE_SEARCH_API_KEY?.trim();
   if (!key) throw new Error("Brave Search is not configured");
-  const query = `"${input.businessName}" "${input.city}" ${input.country} official website Instagram LinkedIn`;
-  const endpoint = new URL("https://api.search.brave.com/res/v1/web/search");
-  endpoint.searchParams.set("q", query);
-  endpoint.searchParams.set("count", "10");
-  endpoint.searchParams.set("search_lang", "en");
-  endpoint.searchParams.set("safesearch", "moderate");
-  endpoint.searchParams.set("country", input.country === "NG" ? "NG" : "GB");
+  const { endpoint, query } = buildBraveSearchRequest(input);
   const response = await fetch(endpoint, {
     headers: {
       Accept: "application/json",
+      "Accept-Encoding": "gzip",
       "X-Subscription-Token": key,
     },
     signal: AbortSignal.timeout(12_000),
   });
-  if (!response.ok) throw new Error(`Brave Search returned ${response.status}`);
+  if (!response.ok) {
+    const responseBody = await response.text();
+    throw new Error(braveSearchErrorMessage(response.status, responseBody));
+  }
   const parsed = searchResponseSchema.parse(await response.json());
   const sourceUrl = `https://search.brave.com/search?q=${encodeURIComponent(query)}`;
   const candidates = new Map<string, BusinessLinkCandidate>();
@@ -245,4 +252,44 @@ export async function searchPublicBusinessPresence(input: {
     }
   }
   return [...candidates.values()];
+}
+
+export function buildBraveSearchRequest(input: {
+  businessName: string;
+  city: string;
+  country: string;
+}) {
+  const market = input.country === "NG" ? "Nigeria" : "United Kingdom";
+  const rawQuery = `"${input.businessName.trim()}" "${input.city.trim()}" ${market} official website Instagram LinkedIn`;
+  const query = rawQuery.split(/\s+/).slice(0, 50).join(" ").slice(0, 400);
+  const endpoint = new URL("https://api.search.brave.com/res/v1/web/search");
+  endpoint.searchParams.set("q", query);
+  endpoint.searchParams.set("count", "10");
+  endpoint.searchParams.set("search_lang", "en");
+  endpoint.searchParams.set("safesearch", "moderate");
+  if (input.country === "UK") endpoint.searchParams.set("country", "gb");
+  return { endpoint, query };
+}
+
+export function braveSearchErrorMessage(status: number, body: string) {
+  const parsed = searchErrorSchema.safeParse(safeJson(body));
+  const code = parsed.success ? parsed.data.error?.code : undefined;
+  const detail = parsed.success ? parsed.data.error?.detail : undefined;
+  if (code === "SUBSCRIPTION_TOKEN_INVALID")
+    return "Brave Search API key is invalid. Replace BRAVE_SEARCH_API_KEY, then restart the app or redeploy Vercel.";
+  if (status === 429)
+    return "Brave Search rate limit reached. Try again later or check the Brave plan limits.";
+  if (status === 422)
+    return detail
+      ? `Brave Search rejected the request: ${detail}`
+      : "Brave Search rejected the request settings.";
+  return `Brave Search is unavailable (HTTP ${status}). Try again shortly.`;
+}
+
+function safeJson(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }

@@ -44,9 +44,6 @@ export async function POST(
   try {
     const businessId = (await params).id;
     const input = bodySchema.parse(await request.json());
-    const existing = await loadGeneration(businessId, input.requestId);
-    if (existing) return NextResponse.json(existing);
-
     const business = await withDatabaseRetry(() =>
       db.query.businesses.findFirst({ where: eq(businesses.id, businessId) }),
     );
@@ -98,6 +95,8 @@ export async function POST(
         { error: "Contact is on the suppression list" },
         { status: 409 },
       );
+    const existing = await loadGeneration(businessId, input.requestId);
+    if (existing) return NextResponse.json(existing);
 
     const audit = await withDatabaseRetry(() =>
       db.query.audits.findFirst({

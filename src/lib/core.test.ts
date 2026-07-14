@@ -9,6 +9,8 @@ import { addBusinessDays, buildPitch } from "./drafts";
 import { normalizeDomain, normalizePhone } from "./ids";
 import { preferredPlacePhone } from "./places";
 import {
+  braveSearchErrorMessage,
+  buildBraveSearchRequest,
   classifyBusinessLink,
   extractPublicBusinessLinks,
 } from "./web-enrichment";
@@ -132,6 +134,34 @@ describe("public business presence", () => {
   it("rejects directory pages as official website candidates", () => {
     expect(classifyBusinessLink("https://booking.com/hotel/test")).toBeNull();
     expect(classifyBusinessLink("https://testhotel.example")).toBe("website");
+  });
+  it("omits unsupported Nigeria country filtering from Brave requests", () => {
+    const nigeria = buildBraveSearchRequest({
+      businessName: "Test Salon",
+      city: "Lagos",
+      country: "NG",
+    });
+    const uk = buildBraveSearchRequest({
+      businessName: "Test Salon",
+      city: "London",
+      country: "UK",
+    });
+    expect(nigeria.endpoint.searchParams.has("country")).toBe(false);
+    expect(nigeria.query).toContain("Nigeria");
+    expect(uk.endpoint.searchParams.get("country")).toBe("gb");
+  });
+  it("explains Brave's invalid-token 422 response", () => {
+    expect(
+      braveSearchErrorMessage(
+        422,
+        JSON.stringify({
+          error: {
+            code: "SUBSCRIPTION_TOKEN_INVALID",
+            detail: "The provided subscription token is invalid.",
+          },
+        }),
+      ),
+    ).toContain("API key is invalid");
   });
 });
 
