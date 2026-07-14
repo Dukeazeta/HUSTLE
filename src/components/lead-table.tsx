@@ -1,0 +1,11 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import { ExternalLink, ScanSearch } from "lucide-react";
+
+type Lead = { id: string; name: string; category: string; country: string; city: string; score: number; stage: string; websiteUrl: string | null; campaignName: string | null; suppressed: boolean };
+export function LeadTable({ leads, demo }: { leads: Lead[]; demo: boolean }) {
+  const [running, setRunning] = useState<string | null>(null); const [notice, setNotice] = useState("");
+  async function audit(id: string) { if (demo) return setNotice("Demo data is read-only. Add Turso credentials to audit real leads."); setRunning(id); const response = await fetch(`/api/leads/${id}/audit`, { method: "POST" }); const data = await response.json(); setRunning(null); if (!response.ok) return setNotice(data.error); setNotice(`Audit complete: score ${data.audit.score}/100`); setTimeout(() => location.reload(), 800); }
+  return <div className="table-wrap">{notice && <div className="notice">{notice}</div>}<table><thead><tr><th>Business</th><th>Market</th><th>Opportunity</th><th>Stage</th><th></th></tr></thead><tbody>{leads.map((lead) => <tr key={lead.id}><td><div className="business-cell"><span className="business-avatar">{lead.name.slice(0, 2).toUpperCase()}</span><div><Link href={`/leads/${lead.id}`}><strong>{lead.name}</strong></Link><small>{lead.category.replaceAll("_", " ")} · {lead.campaignName}</small></div></div></td><td><span className="market-chip">{lead.country}</span> {lead.city}</td><td><div className="score"><span style={{ width: `${lead.score}%` }} /><b>{lead.score}</b></div></td><td><span className={`stage stage-${lead.stage}`}>{lead.stage.replaceAll("_", " ")}</span></td><td><div className="row-actions"><button className="icon-button" onClick={() => audit(lead.id)} title="Run audit" disabled={running === lead.id}><ScanSearch size={17} /></button>{lead.websiteUrl && <a className="icon-button" href={lead.websiteUrl} target="_blank" rel="noreferrer" title="Open website"><ExternalLink size={17} /></a>}</div></td></tr>)}</tbody></table>{!leads.length && <div className="empty-state"><ScanSearch size={28} /><h3>No leads yet</h3><p>Create a campaign and run its first search.</p></div>}</div>;
+}
