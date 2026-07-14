@@ -8,6 +8,13 @@
       "when": 1784048238657,
       "tag": "0000_spooky_gorgon",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1784053285677,
+      "tag": "0001_dusty_roland_deschain",
+      "breakpoints": true
     }
   ]
 }

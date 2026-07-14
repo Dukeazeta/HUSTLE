@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "HUSTLE — Sales Copilot",
-  description: "Evidence-led business discovery and outreach for a private studio.",
+  description:
+    "Evidence-led business discovery and outreach for a private studio.",
 };
 
 export default function RootLayout({

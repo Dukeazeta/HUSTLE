@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/db";
 import { activities, businesses, outreachDrafts } from "@/db/schema";
 import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
-import { addBusinessDays } from "@/lib/drafts";
 import { id } from "@/lib/ids";
 
 export async function POST(
@@ -19,60 +18,35 @@ export async function POST(
     });
     if (!draft)
       return NextResponse.json({ error: "Draft not found" }, { status: 404 });
-    if (draft.sentAt)
+    if (draft.followUpSentAt)
       return NextResponse.json({
-        sentAt: draft.sentAt,
-        followUpDueAt: draft.followUpDueAt,
+        sentAt: draft.followUpSentAt,
         alreadyRecorded: true,
       });
     const business = await db.query.businesses.findFirst({
       where: eq(businesses.id, draft.businessId),
     });
-    if (!business || business.suppressed)
+    if (!business || business.suppressed || !draft.followUpBody)
       return NextResponse.json(
-        { error: "Suppressed contacts cannot be messaged" },
+        { error: "Follow-up is unavailable" },
         { status: 409 },
       );
-    const targetChannel = draft.channel === "email" ? "email" : "whatsapp";
-    const verified = await db.query.contacts.findFirst({
-      where: (table, { and, eq }) =>
-        and(
-          eq(table.businessId, draft.businessId),
-          eq(table.channel, targetChannel),
-          eq(table.verified, true),
-        ),
-    });
-    if (!verified)
-      return NextResponse.json(
-        { error: `Verify a ${targetChannel} contact before sending` },
-        { status: 409 },
-      );
-    const sentAt = new Date();
-    const followUpDueAt = addBusinessDays(sentAt, 5);
+    const now = new Date().toISOString();
     await db.transaction(async (tx) => {
       await tx
         .update(outreachDrafts)
-        .set({
-          status: "sent",
-          sentAt: sentAt.toISOString(),
-          followUpDueAt: followUpDueAt.toISOString(),
-          updatedAt: sentAt.toISOString(),
-        })
+        .set({ followUpSentAt: now, followUpDueAt: null, updatedAt: now })
         .where(eq(outreachDrafts.id, draftId));
-      await tx
-        .update(businesses)
-        .set({ stage: "contacted", updatedAt: sentAt.toISOString() })
-        .where(eq(businesses.id, draft.businessId));
       await tx
         .insert(activities)
         .values({
           id: id("act"),
           businessId: draft.businessId,
-          type: "outreach_sent",
-          detail: `${draft.channel} outreach manually confirmed`,
+          type: "follow_up_sent",
+          detail: `${draft.channel} follow-up manually confirmed`,
         });
     });
-    return NextResponse.json({ sentAt, followUpDueAt });
+    return NextResponse.json({ sentAt: now });
   } catch (error) {
     return apiError(error);
   }

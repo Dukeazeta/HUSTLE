@@ -7,12 +7,24 @@ import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
 import { CATEGORIES } from "@/lib/constants";
 import { id } from "@/lib/ids";
 
-const inputSchema = z.object({ name: z.string().min(3).max(80), country: z.enum(["NG", "UK"]), city: z.string().min(2).max(80), category: z.enum(CATEGORIES), resultLimit: z.number().int().min(1).max(60).default(20), budgetMinor: z.number().int().min(0).default(0) });
+const inputSchema = z.object({
+  name: z.string().min(3).max(80),
+  country: z.enum(["NG", "UK"]),
+  city: z.string().min(2).max(80),
+  category: z.enum(CATEGORIES),
+  resultLimit: z.number().int().min(1).max(60).default(20),
+  budgetMinor: z.number().int().min(0).default(0),
+});
 
 export async function GET() {
   if (!(await requireOwner())) return unauthorized();
   if (!isDatabaseConfigured()) return NextResponse.json({ campaigns: [] });
-  return NextResponse.json({ campaigns: await db.select().from(campaigns).orderBy(desc(campaigns.createdAt)) });
+  return NextResponse.json({
+    campaigns: await db
+      .select()
+      .from(campaigns)
+      .orderBy(desc(campaigns.createdAt)),
+  });
 }
 
 export async function POST(request: Request) {
@@ -23,5 +35,7 @@ export async function POST(request: Request) {
     const record = { id: id("cmp"), ...data, status: "active" as const };
     await db.insert(campaigns).values(record);
     return NextResponse.json({ campaign: record }, { status: 201 });
-  } catch (error) { return apiError(error); }
+  } catch (error) {
+    return apiError(error);
+  }
 }

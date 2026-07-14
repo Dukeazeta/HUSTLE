@@ -7,7 +7,11 @@ import { accounts, sessions, users, verificationTokens } from "@/db/schema";
 const ownerEmail = process.env.OWNER_EMAIL?.trim().toLowerCase();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.AUTH_SECRET ?? (process.env.DEMO_MODE === "true" ? "demo-only-secret-never-use-in-production" : undefined),
+  secret:
+    process.env.AUTH_SECRET ??
+    (process.env.DEMO_MODE === "true"
+      ? "demo-only-secret-never-use-in-production"
+      : undefined),
   adapter: DrizzleAdapter(db, {
     usersTable: users,
     accountsTable: accounts,
@@ -19,7 +23,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: { signIn: "/login", error: "/login" },
   callbacks: {
     signIn({ profile }) {
-      return Boolean(ownerEmail && profile?.email?.toLowerCase() === ownerEmail);
+      return Boolean(
+        ownerEmail && profile?.email?.toLowerCase() === ownerEmail,
+      );
     },
     authorized({ auth: session }) {
       if (process.env.DEMO_MODE === "true") return true;
