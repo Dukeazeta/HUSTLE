@@ -24,11 +24,12 @@ export async function POST(
 
     const start = new Date();
     start.setUTCHours(0, 0, 0, 0);
+    const dayStart = start.toISOString().slice(0, 10);
     const cachedSearch = await db.query.activities.findFirst({
       where: and(
         eq(activities.businessId, businessId),
         eq(activities.type, "web_enrichment"),
-        gte(activities.createdAt, start.toISOString()),
+        gte(activities.createdAt, dayStart),
       ),
       orderBy: [desc(activities.createdAt)],
     });
@@ -53,7 +54,7 @@ export async function POST(
       .where(
         and(
           eq(activities.type, "web_enrichment"),
-          gte(activities.createdAt, start.toISOString()),
+          gte(activities.createdAt, dayStart),
         ),
       );
     const dailyLimit = Math.max(1, Number(process.env.BRAVE_DAILY_LIMIT ?? 30));

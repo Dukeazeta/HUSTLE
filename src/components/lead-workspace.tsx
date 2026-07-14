@@ -227,9 +227,9 @@ export function LeadWorkspace({
     );
     const startClosing = window.setTimeout(
       () => setMessageClosing(true),
-      5_800,
+      7_800,
     );
-    const clearMessage = window.setTimeout(() => setMessage(""), 6_000);
+    const clearMessage = window.setTimeout(() => setMessage(""), 8_000);
     return () => {
       window.clearTimeout(revealMessage);
       window.clearTimeout(startClosing);
@@ -660,6 +660,7 @@ export function LeadWorkspace({
           <span>{message}</span>
           <button
             type="button"
+            data-testid="close-notification"
             aria-label="Close notification"
             onClick={dismissMessage}
           >
