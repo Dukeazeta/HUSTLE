@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { auditWebsite, extractPublicContacts } from "./audit";
+import {
+  auditWebsite,
+  calculateOpportunityScore,
+  discoveredContactVerification,
+  extractPublicContacts,
+} from "./audit";
 import { addBusinessDays, buildPitch } from "./drafts";
 import { normalizeDomain, normalizePhone } from "./ids";
 import { preferredPlacePhone } from "./places";
+import {
+  classifyBusinessLink,
+  extractPublicBusinessLinks,
+} from "./web-enrichment";
 import { withDatabaseRetry } from "./db-retry";
 import {
   buildFollowUp,
@@ -49,6 +58,16 @@ describe("website audit", () => {
     expect(result.score).toBeGreaterThanOrEqual(60);
     expect(result.findings[0].code).toBe("missing_website");
   });
+  it("automatically trusts only an explicitly published WhatsApp link", () => {
+    expect(discoveredContactVerification("whatsapp")).toMatchObject({
+      verified: true,
+      verificationMethod: "published_whatsapp",
+    });
+    expect(discoveredContactVerification("phone")).toMatchObject({
+      verified: false,
+      verificationMethod: "unverified",
+    });
+  });
   it("extracts only explicit public contact links with their source", () => {
     const result = extractPublicContacts(
       '<a href="mailto:Hello@Example.com">Email</a><a href="https://wa.me/2348012345678">Chat</a><a href="tel:+44 20 1234 5678">Call</a>',
@@ -80,6 +99,55 @@ describe("website audit", () => {
         }),
       ]),
     );
+  });
+});
+
+describe("public business presence", () => {
+  it("collects business social profiles linked from the official website", () => {
+    const links = extractPublicBusinessLinks(
+      [
+        '<a href="https://instagram.com/testhotel/">Instagram</a>',
+        '<a href="https://linkedin.com/company/test-hotel">LinkedIn</a>',
+        '<a href="https://linkedin.com/in/private-person">Person</a>',
+      ].join(""),
+      "https://testhotel.example/contact",
+    );
+    expect(links.map((link) => link.type).sort()).toEqual([
+      "instagram",
+      "linkedin",
+    ]);
+    expect(links.every((link) => link.verificationStatus === "confirmed")).toBe(
+      true,
+    );
+  });
+  it("rejects directory pages as official website candidates", () => {
+    expect(classifyBusinessLink("https://booking.com/hotel/test")).toBeNull();
+    expect(classifyBusinessLink("https://testhotel.example")).toBe("website");
+  });
+});
+
+describe("opportunity scoring", () => {
+  it("scores the same website need differently using real sales evidence", () => {
+    const hardToReach = calculateOpportunityScore({
+      websiteNeed: 60,
+      contactChannels: [],
+      rating: 3.4,
+      userRatingCount: 3,
+      hasAddress: true,
+      hasPlaceId: true,
+      category: "hotel",
+    });
+    const activeAndReachable = calculateOpportunityScore({
+      websiteNeed: 60,
+      contactChannels: ["phone", "whatsapp"],
+      rating: 4.7,
+      userRatingCount: 250,
+      hasAddress: true,
+      hasPlaceId: true,
+      category: "hotel",
+    });
+    expect(hardToReach).toBe(66);
+    expect(activeAndReachable).toBe(98);
   });
 });
 

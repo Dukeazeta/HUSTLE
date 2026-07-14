@@ -42,6 +42,8 @@ Generate migrations after schema changes with `pnpm db:generate`. Review generat
 
 Google Places costs vary by requested fields. Set `GOOGLE_PLACES_ESTIMATED_REQUEST_MINOR` to the expected per-search amount in the campaign budget's minor unit; the application stops a search that would exceed its cap.
 
+Optional public-web enrichment uses the Brave Search API to discover candidate official websites and business-owned social profiles. Set `BRAVE_SEARCH_API_KEY` and keep `BRAVE_DAILY_LIMIT` bounded. Search results are never trusted automatically: website candidates require confirmation, while social links found directly on an existing business website are recorded as confirmed evidence.
+
 ## Verification
 
 ```powershell

@@ -1,6 +1,7 @@
 "use client";
+
 import { useState } from "react";
-import { MapPin, Play } from "lucide-react";
+import { MapPin, Play, Square, Trash2 } from "lucide-react";
 
 type Campaign = {
   id: string;
@@ -13,6 +14,7 @@ type Campaign = {
   spentMinor: number;
   budgetMinor: number;
 };
+
 export function CampaignCard({
   campaign,
   demo,
@@ -21,32 +23,83 @@ export function CampaignCard({
   demo: boolean;
 }) {
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState(campaign.status);
   const [message, setMessage] = useState("");
+
+  async function request(
+    action: "search" | "stop" | "delete",
+    init: RequestInit,
+  ) {
+    setBusy(true);
+    setMessage("");
+    try {
+      const path =
+        action === "search"
+          ? `/api/campaigns/${campaign.id}/search`
+          : `/api/campaigns/${campaign.id}`;
+      const response = await fetch(path, init);
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error ?? `Could not ${action} campaign`);
+      return data;
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Something went wrong",
+      );
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function search() {
     if (demo)
       return setMessage(
         "Connect Turso and Google Places to run this campaign.",
       );
-    setBusy(true);
-    const response = await fetch(`/api/campaigns/${campaign.id}/search`, {
-      method: "POST",
-    });
-    const data = await response.json();
-    setBusy(false);
-    setMessage(
-      response.ok
-        ? `${data.imported} imported · ${data.duplicates} duplicates`
-        : data.error,
-    );
-    if (response.ok) setTimeout(() => location.reload(), 900);
+    const data = await request("search", { method: "POST" });
+    if (!data) return;
+    setMessage(`${data.imported} imported · ${data.duplicates} duplicates`);
+    setTimeout(() => location.reload(), 900);
   }
+
+  async function stop() {
+    if (
+      !window.confirm(
+        "Stop this campaign? Its existing leads and history will be preserved.",
+      )
+    )
+      return;
+    const data = await request("stop", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "stop" }),
+    });
+    if (!data) return;
+    setStatus("complete");
+    setMessage("Campaign stopped. Existing leads were preserved.");
+  }
+
+  async function remove() {
+    if (
+      !window.confirm(
+        `Permanently delete “${campaign.name}” and all of its leads, audits, drafts, and history? This cannot be undone.`,
+      )
+    )
+      return;
+    const data = await request("delete", { method: "DELETE" });
+    if (data) location.reload();
+  }
+
   return (
     <article className="campaign-card">
       <div className="campaign-top">
         <div className={`market-flag ${campaign.country.toLowerCase()}`}>
           {campaign.country}
         </div>
-        <span className="status-dot">{campaign.status}</span>
+        <span className="status-dot">
+          {status === "complete" ? "stopped" : status}
+        </span>
       </div>
       <h3>{campaign.name}</h3>
       <p>
@@ -61,10 +114,26 @@ export function CampaignCard({
             : "No cap"}
         </span>
       </div>
-      <button className="secondary-button" onClick={search} disabled={busy}>
-        <Play size={15} />
-        {busy ? "Searching…" : "Run search"}
-      </button>
+      <div className="campaign-actions">
+        <button
+          className="secondary-button"
+          onClick={search}
+          disabled={busy || status !== "active"}
+        >
+          <Play size={15} />
+          {busy ? "Working…" : status === "active" ? "Run search" : "Stopped"}
+        </button>
+        {status === "active" && (
+          <button className="stop-button" onClick={stop} disabled={busy}>
+            <Square size={14} />
+            Stop
+          </button>
+        )}
+        <button className="delete-button" onClick={remove} disabled={busy}>
+          <Trash2 size={14} />
+          Delete
+        </button>
+      </div>
       {message && <small className="inline-message">{message}</small>}
     </article>
   );

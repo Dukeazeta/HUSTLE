@@ -1,6 +1,10 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { normalizePhone } from "./ids";
+import {
+  extractPublicBusinessLinks,
+  type BusinessLinkCandidate,
+} from "./web-enrichment";
 
 export type AuditFinding = {
   code: string;
@@ -24,7 +28,34 @@ export type WebsiteAudit = {
   findings: AuditFinding[];
   summary: string;
   contacts: DiscoveredContact[];
+  links: BusinessLinkCandidate[];
 };
+
+export type OpportunityScoreInput = {
+  websiteNeed: number;
+  contactChannels: Array<DiscoveredContact["channel"]>;
+  rating?: number | null;
+  userRatingCount?: number | null;
+  hasAddress: boolean;
+  hasPlaceId: boolean;
+  category: string;
+};
+
+export function discoveredContactVerification(
+  channel: DiscoveredContact["channel"],
+) {
+  return channel === "whatsapp"
+    ? {
+        verified: true,
+        isPrimary: true,
+        verificationMethod: "published_whatsapp" as const,
+      }
+    : {
+        verified: false,
+        isPrimary: false,
+        verificationMethod: "unverified" as const,
+      };
+}
 
 const MAX_CONTACT_PAGES = 3;
 const CONTACT_PAGE_BYTES = 750_000;
@@ -69,6 +100,44 @@ function add(
   recommendation: string,
 ) {
   findings.push({ code, severity, title, evidence, recommendation });
+}
+
+export function calculateOpportunityScore(input: OpportunityScoreInput) {
+  let score = Math.max(0, Math.min(60, input.websiteNeed));
+  const channels = new Set(input.contactChannels);
+
+  if (channels.has("email") || channels.has("whatsapp")) score += 20;
+  else if (channels.has("phone")) score += 16;
+
+  if (input.rating != null) {
+    if (input.rating >= 4.5) score += 5;
+    else if (input.rating >= 4) score += 4;
+    else if (input.rating >= 3.5) score += 2;
+    else if (input.rating >= 3) score += 1;
+  }
+
+  const reviews = input.userRatingCount ?? 0;
+  if (reviews >= 500) score += 10;
+  else if (reviews >= 100) score += 8;
+  else if (reviews >= 25) score += 5;
+  else if (reviews >= 5) score += 2;
+
+  if (input.hasAddress) score += 2;
+  if (input.hasPlaceId) score += 2;
+  if (
+    [
+      "restaurant",
+      "hotel",
+      "salon",
+      "spa",
+      "caterer",
+      "event_venue",
+      "beauty",
+    ].includes(input.category)
+  )
+    score += 1;
+
+  return Math.min(100, score);
 }
 
 export function extractPublicContacts(
@@ -214,11 +283,12 @@ export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
       httpStatus: null,
       responseMs: null,
       pageBytes: 0,
-      score: 82,
+      score: 60,
       findings,
       summary:
         "The business has no website, creating a clear website-launch opportunity.",
       contacts: [],
+      links: [],
     };
   }
   const url = await assertPublicUrl(raw);
@@ -253,10 +323,11 @@ export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
       httpStatus: null,
       responseMs: Date.now() - started,
       pageBytes: 0,
-      score: 88,
+      score: 58,
       findings,
       summary: "The listed website is unreachable.",
       contacts: [],
+      links: [],
     };
   }
   const responseMs = Date.now() - started;
@@ -282,6 +353,12 @@ export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
       item,
     ]),
   );
+  const links = new Map(
+    extractPublicBusinessLinks(html, finalUrl).map((item) => [
+      item.normalizedUrl,
+      item,
+    ]),
+  );
   const contactLinks = discoverContactPageUrls(html, finalUrl);
   for (const contactUrl of contactLinks) {
     try {
@@ -290,6 +367,11 @@ export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
       if (!contactHtml) continue;
       for (const item of extractPublicContacts(contactHtml, contactUrl.href))
         contacts.set(`${item.channel}:${item.normalizedValue}`, item);
+      for (const item of extractPublicBusinessLinks(
+        contactHtml,
+        contactUrl.href,
+      ))
+        links.set(item.normalizedUrl, item);
     } catch {
       /* Contact enrichment is best-effort and never fails the audit. */
     }
@@ -379,10 +461,10 @@ export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
       "Add a clearly visible business contact method and keep it consistent across the website.",
     );
   const score = Math.min(
-    100,
+    60,
     findings.reduce(
-      (total, f) => total + { high: 22, medium: 12, low: 6 }[f.severity],
-      8,
+      (total, f) => total + { high: 14, medium: 8, low: 4 }[f.severity],
+      0,
     ),
   );
   return {
@@ -396,5 +478,6 @@ export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
       ? `${findings.length} evidence-backed website opportunities were found.`
       : "No strong website-rescue opportunity was detected.",
     contacts: [...contacts.values()],
+    links: [...links.values()],
   };
 }

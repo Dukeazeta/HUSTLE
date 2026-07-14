@@ -128,6 +128,9 @@ export async function PATCH(
             businessId,
             normalizedValue,
             discoveredAt: now,
+            verificationMethod: input.contact.verified
+              ? "manual"
+              : "unverified",
           })
           .onConflictDoUpdate({
             target: [
@@ -139,6 +142,9 @@ export async function PATCH(
               sourceUrl: input.contact.sourceUrl,
               verified: input.contact.verified,
               isPrimary: input.contact.isPrimary,
+              verificationMethod: input.contact.verified
+                ? "manual"
+                : "unverified",
               updatedAt: now,
             },
           });
@@ -152,16 +158,14 @@ export async function PATCH(
             )
             .where(eq(businesses.id, businessId));
       }
-      await tx
-        .insert(activities)
-        .values({
-          id: id("act"),
-          businessId,
-          type: input.contact ? "contact_updated" : "lead_updated",
-          detail: input.stage
-            ? `Stage changed from ${business.stage} to ${input.stage}`
-            : "Lead details updated",
-        });
+      await tx.insert(activities).values({
+        id: id("act"),
+        businessId,
+        type: input.contact ? "contact_updated" : "lead_updated",
+        detail: input.stage
+          ? `Stage changed from ${business.stage} to ${input.stage}`
+          : "Lead details updated",
+      });
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

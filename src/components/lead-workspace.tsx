@@ -3,6 +3,9 @@
 import { useState } from "react";
 import {
   ArrowUpRight,
+  AtSign,
+  BriefcaseBusiness,
+  Camera,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -14,12 +17,15 @@ import {
   LoaderCircle,
   Mail,
   MessageCircle,
+  Music2,
   Plus,
   Save,
   ScanSearch,
+  Search,
   ShieldCheck,
   ShieldX,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { PACKAGES, PIPELINE_STAGES } from "@/lib/constants";
 
@@ -43,6 +49,17 @@ type Contact = {
   sourceUrl: string;
   verified: boolean;
   isPrimary: boolean;
+  verificationMethod: "unverified" | "manual" | "published_whatsapp";
+};
+
+type BusinessLink = {
+  id: string;
+  type: "website" | "instagram" | "linkedin" | "facebook" | "x" | "tiktok";
+  url: string;
+  sourceUrl: string;
+  verificationStatus: "candidate" | "confirmed" | "rejected";
+  confidence: number;
+  evidence: string;
 };
 
 type Opportunity = {
@@ -103,6 +120,15 @@ const workflow = [
   { id: "payment", label: "Payment", icon: CircleDollarSign },
 ] as const;
 
+const businessLinkIcons = {
+  website: Globe2,
+  instagram: Camera,
+  linkedin: BriefcaseBusiness,
+  facebook: Users,
+  x: AtSign,
+  tiktok: Music2,
+};
+
 type WorkflowStage = (typeof workflow)[number]["id"];
 
 function initialWorkflow(stage: string): WorkflowStage {
@@ -121,6 +147,7 @@ export function LeadWorkspace({
   canDraft,
   drafts: initialDrafts,
   contacts: initialContacts,
+  links: initialLinks,
   opportunity: initialOpportunity,
   proposal: initialProposal,
   activities,
@@ -132,6 +159,7 @@ export function LeadWorkspace({
   canDraft: boolean;
   drafts: Draft[];
   contacts: Contact[];
+  links: BusinessLink[];
   opportunity: Opportunity;
   proposal: Proposal;
   activities: Activity[];
@@ -141,12 +169,14 @@ export function LeadWorkspace({
   const [lead, setLead] = useState(initialLead);
   const [drafts, setDrafts] = useState(initialDrafts);
   const [contacts, setContacts] = useState(initialContacts);
+  const [links, setLinks] = useState(initialLinks);
   const [opportunity, setOpportunity] = useState(initialOpportunity);
   const [active, setActive] = useState<WorkflowStage>(
     initialWorkflow(initialLead.stage),
   );
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [checkedWhatsAppContact, setCheckedWhatsAppContact] = useState("");
   const [contactForm, setContactForm] = useState({
     channel: "email" as Contact["channel"],
     value: "",
@@ -325,6 +355,71 @@ export function LeadWorkspace({
       );
       setMessage("Contact verified.");
     }
+  }
+
+  function checkWhatsApp(contact: Contact) {
+    const phone = contact.value.replace(/\D/g, "");
+    window.open(`https://wa.me/${phone}`, "_blank", "noopener,noreferrer");
+    setCheckedWhatsAppContact(contact.id);
+    setMessage(
+      "WhatsApp opened without a message. Confirm only if the business profile is available.",
+    );
+  }
+
+  async function confirmWhatsApp(contact: Contact) {
+    if (
+      await request(`/api/leads/${lead.id}`, "PATCH", {
+        contact: {
+          channel: "whatsapp",
+          value: contact.value,
+          sourceUrl: contact.sourceUrl,
+          verified: true,
+          isPrimary: true,
+        },
+      })
+    )
+      refresh("WhatsApp contact confirmed and ready for outreach.");
+  }
+
+  async function enrichPublicPresence() {
+    const data = await request(`/api/leads/${lead.id}/enrich`);
+    if (!data) return;
+    setLinks(data.links);
+    setMessage(
+      data.cached
+        ? "Showing today’s saved public-web results."
+        : `${data.links.length} public website and profile candidates found.`,
+    );
+  }
+
+  async function reviewBusinessLink(
+    link: BusinessLink,
+    action: "confirm" | "reject",
+  ) {
+    const data = await request(
+      `/api/leads/${lead.id}/links/${link.id}`,
+      "PATCH",
+      { action },
+    );
+    if (!data) return;
+    if (action === "confirm" && link.type === "website")
+      return refresh(
+        "Official website confirmed. Run the audit again to inspect it.",
+      );
+    setLinks((rows) =>
+      rows
+        .map((row) =>
+          row.id === link.id
+            ? { ...row, verificationStatus: data.link.verificationStatus }
+            : row,
+        )
+        .filter((row) => row.verificationStatus !== "rejected"),
+    );
+    setMessage(
+      action === "confirm"
+        ? `${link.type} profile confirmed.`
+        : "Candidate dismissed.",
+    );
   }
 
   async function optOut() {
@@ -533,10 +628,32 @@ export function LeadWorkspace({
                             View source <ExternalLink />
                           </a>
                         </div>
-                        {contact.verified ? (
+                        {contact.channel === "phone" ? (
+                          <div className="contact-check-actions">
+                            <span className="whatsapp-unknown">
+                              WhatsApp unknown
+                            </span>
+                            <button onClick={() => checkWhatsApp(contact)}>
+                              Check WhatsApp
+                            </button>
+                            {checkedWhatsAppContact === contact.id && (
+                              <button
+                                className="confirm-whatsapp"
+                                onClick={() => confirmWhatsApp(contact)}
+                              >
+                                I found it
+                              </button>
+                            )}
+                          </div>
+                        ) : contact.verified ? (
                           <span className="verified">
                             <Check />
-                            Verified
+                            {contact.channel === "whatsapp"
+                              ? contact.verificationMethod ===
+                                "published_whatsapp"
+                                ? "WhatsApp link found"
+                                : "WhatsApp confirmed"
+                              : "Verified"}
                           </span>
                         ) : (
                           <button onClick={() => verifyContact(contact)}>
@@ -645,6 +762,93 @@ export function LeadWorkspace({
                   </button>
                 </section>
               </div>
+              <section className="surface-panel presence-panel">
+                <div className="panel-title presence-title">
+                  <span>
+                    <Search />
+                  </span>
+                  <div>
+                    <h3>Public presence</h3>
+                    <p>
+                      Find an official website and business-owned social
+                      profiles beyond the Google listing.
+                    </p>
+                  </div>
+                  <button
+                    className="secondary-action"
+                    onClick={enrichPublicPresence}
+                    disabled={busy}
+                  >
+                    <Search />
+                    {busy ? "Searching…" : "Search public web"}
+                  </button>
+                </div>
+                <div className="presence-grid">
+                  {links.filter(
+                    (link) => link.verificationStatus !== "rejected",
+                  ).length === 0 && (
+                    <div className="presence-empty">
+                      <Globe2 />
+                      <div>
+                        <b>No additional profiles collected yet</b>
+                        <p>
+                          Run the website audit or search the public web. Every
+                          result remains a candidate until its evidence is
+                          confirmed.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {links
+                    .filter((link) => link.verificationStatus !== "rejected")
+                    .map((link) => {
+                      const LinkIcon = businessLinkIcons[link.type];
+                      return (
+                        <article key={link.id} className="presence-card">
+                          <div className="presence-icon">
+                            <LinkIcon />
+                          </div>
+                          <div className="presence-copy">
+                            <div>
+                              <b>{link.type}</b>
+                              <span>{link.confidence}% match</span>
+                            </div>
+                            <a href={link.url} target="_blank" rel="noreferrer">
+                              {new URL(link.url).hostname.replace(/^www\./, "")}
+                              <ExternalLink />
+                            </a>
+                            <small>{link.evidence}</small>
+                          </div>
+                          <div className="presence-actions">
+                            {link.verificationStatus === "confirmed" ? (
+                              <span className="verified">
+                                <Check /> Confirmed
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    reviewBusinessLink(link, "confirm")
+                                  }
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  className="dismiss-link"
+                                  onClick={() =>
+                                    reviewBusinessLink(link, "reject")
+                                  }
+                                >
+                                  Dismiss
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                </div>
+              </section>
             </div>
           )}
 

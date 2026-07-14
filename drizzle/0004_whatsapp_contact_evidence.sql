@@ -1,0 +1,1 @@
+ALTER TABLE `contacts` ADD `verification_method` text DEFAULT 'unverified' NOT NULL;

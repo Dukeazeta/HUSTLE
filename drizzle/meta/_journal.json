@@ -22,6 +22,27 @@
       "when": 1784063482069,
       "tag": "0002_backfill_listing_contacts",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784064691541,
+      "tag": "0003_realistic_opportunity_scoring",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1784065587785,
+      "tag": "0004_whatsapp_contact_evidence",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1784066316336,
+      "tag": "0005_public_business_presence",
+      "breakpoints": true
     }
   ]
 }

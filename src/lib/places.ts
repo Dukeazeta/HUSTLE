@@ -7,6 +7,8 @@ const placeSchema = z.object({
   websiteUri: z.string().url().optional(),
   nationalPhoneNumber: z.string().optional(),
   internationalPhoneNumber: z.string().optional(),
+  rating: z.number().min(0).max(5).optional(),
+  userRatingCount: z.number().int().nonnegative().optional(),
   googleMapsUri: z.string().url().optional(),
   primaryType: z.string().optional(),
 });
@@ -18,6 +20,8 @@ const placeDetailsSchema = z.object({
   websiteUri: z.string().url().optional(),
   nationalPhoneNumber: z.string().optional(),
   internationalPhoneNumber: z.string().optional(),
+  rating: z.number().min(0).max(5).optional(),
+  userRatingCount: z.number().int().nonnegative().optional(),
   googleMapsUri: z.string().url().optional(),
 });
 
@@ -46,7 +50,7 @@ export async function searchPlaces(input: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": key,
         "X-Goog-FieldMask":
-          "places.id,places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.googleMapsUri,places.primaryType",
+          "places.id,places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.rating,places.userRatingCount,places.googleMapsUri,places.primaryType",
       },
       body: JSON.stringify({
         textQuery: `${input.category.replaceAll("_", " ")} in ${input.city}, ${input.country === "NG" ? "Nigeria" : "United Kingdom"}`,
@@ -73,7 +77,7 @@ export async function getPlaceDetails(placeId: string) {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": key,
         "X-Goog-FieldMask":
-          "id,websiteUri,nationalPhoneNumber,internationalPhoneNumber,googleMapsUri",
+          "id,websiteUri,nationalPhoneNumber,internationalPhoneNumber,rating,userRatingCount,googleMapsUri",
       },
       signal: AbortSignal.timeout(10_000),
     },

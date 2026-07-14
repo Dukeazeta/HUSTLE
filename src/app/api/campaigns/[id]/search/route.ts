@@ -22,6 +22,11 @@ export async function POST(
         { error: "Campaign not found" },
         { status: 404 },
       );
+    if (campaign.status !== "active")
+      return NextResponse.json(
+        { error: "This campaign is stopped and cannot run new searches" },
+        { status: 409 },
+      );
     const estimatedCost = Number(
       process.env.GOOGLE_PLACES_ESTIMATED_REQUEST_MINOR ?? 0,
     );
@@ -59,6 +64,8 @@ export async function POST(
           websiteUrl: place.websiteUri,
           normalizedDomain: normalizeDomain(place.websiteUri),
           phone: normalizePhone(phone),
+          rating: place.rating,
+          userRatingCount: place.userRatingCount,
           sourceUrl,
           sourceDiscoveredAt: new Date().toISOString(),
         })
@@ -84,6 +91,8 @@ export async function POST(
               ? normalizeDomain(place.websiteUri)
               : undefined,
             phone: phone ? normalizePhone(phone) : undefined,
+            rating: place.rating,
+            userRatingCount: place.userRatingCount,
             sourceUrl,
             updatedAt: new Date().toISOString(),
           })

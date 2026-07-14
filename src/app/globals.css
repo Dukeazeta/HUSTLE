@@ -675,6 +675,38 @@ button {
   width: 100%;
   background: var(--soft);
 }
+.campaign-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 7px;
+}
+.campaign-actions button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.campaign-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.campaign-actions .stop-button {
+  color: var(--ink);
+  background: var(--surface);
+}
+.campaign-actions .delete-button {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+  border-color: color-mix(in srgb, var(--danger) 24%, var(--line));
+}
 .inline-message {
   display: block;
   color: var(--green);
@@ -1137,6 +1169,157 @@ button {
 }
 .verified svg {
   width: 11px;
+}
+.contact-cards article .contact-check-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  max-width: 210px;
+}
+.contact-check-actions button {
+  padding: 6px 8px;
+  color: var(--green);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.contact-check-actions .confirm-whatsapp {
+  color: var(--forest);
+  background: var(--lime);
+  border-color: var(--lime);
+}
+.whatsapp-unknown {
+  width: 100%;
+  color: var(--muted);
+  font-size: 9px;
+  text-align: right;
+}
+.presence-panel {
+  margin-top: 14px;
+}
+.presence-title {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+.presence-title .secondary-action {
+  width: auto;
+  margin: 0;
+}
+.presence-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 9px;
+  margin-top: 14px;
+}
+.presence-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  background: #f8faf8;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.presence-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--green);
+  background: var(--soft);
+  border-radius: 8px;
+}
+.presence-icon svg {
+  width: 15px;
+}
+.presence-copy {
+  min-width: 0;
+}
+.presence-copy > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.presence-copy b {
+  font-size: 10px;
+  text-transform: capitalize;
+}
+.presence-copy span,
+.presence-copy small {
+  color: var(--muted);
+  font-size: 9px;
+}
+.presence-copy a {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0;
+  overflow: hidden;
+  color: var(--green);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.presence-copy a svg {
+  width: 10px;
+  flex: 0 0 auto;
+}
+.presence-copy small {
+  display: block;
+  line-height: 1.4;
+}
+.presence-actions {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.presence-actions button {
+  padding: 5px 8px;
+  color: var(--green);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.presence-actions .dismiss-link {
+  color: var(--muted);
+}
+.presence-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  color: var(--muted);
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+}
+.presence-empty > svg {
+  width: 18px;
+  color: var(--green);
+}
+.presence-empty b {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--ink);
+  font-size: 10px;
+}
+.presence-empty p {
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.5;
 }
 .inline-form {
   display: grid;

@@ -4,6 +4,7 @@ import { db, isDatabaseConfigured } from "@/db";
 import {
   activities,
   audits,
+  businessLinks,
   businesses,
   contacts,
   findings,
@@ -61,6 +62,13 @@ export default async function LeadPage({
   const contactRows = configured
     ? await db.select().from(contacts).where(eq(contacts.businessId, leadId))
     : [];
+  const linkRows = configured
+    ? await db
+        .select()
+        .from(businessLinks)
+        .where(eq(businessLinks.businessId, leadId))
+        .orderBy(desc(businessLinks.confidence))
+    : [];
   const opportunity = configured
     ? ((await db.query.opportunities.findFirst({
         where: eq(opportunities.businessId, leadId),
@@ -115,6 +123,7 @@ export default async function LeadPage({
         contacts={
           contactRows as Parameters<typeof LeadWorkspace>[0]["contacts"]
         }
+        links={linkRows as Parameters<typeof LeadWorkspace>[0]["links"]}
         opportunity={opportunity}
         proposal={proposal}
         activities={activityRows}

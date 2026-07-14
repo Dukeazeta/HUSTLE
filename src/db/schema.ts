@@ -97,6 +97,8 @@ export const businesses = sqliteTable(
     normalizedDomain: text("normalized_domain"),
     phone: text("phone"),
     email: text("email"),
+    rating: real("rating"),
+    userRatingCount: integer("user_rating_count"),
     sourceUrl: text("source_url").notNull(),
     sourceDiscoveredAt: text("source_discovered_at").notNull(),
     legalForm: text("legal_form", {
@@ -152,6 +154,11 @@ export const contacts = sqliteTable(
     sourceUrl: text("source_url").notNull(),
     discoveredAt: text("discovered_at").notNull(),
     verified: integer("verified", { mode: "boolean" }).notNull().default(false),
+    verificationMethod: text("verification_method", {
+      enum: ["unverified", "manual", "published_whatsapp"],
+    })
+      .notNull()
+      .default("unverified"),
     isPrimary: integer("is_primary", { mode: "boolean" })
       .notNull()
       .default(false),
@@ -164,6 +171,35 @@ export const contacts = sqliteTable(
       t.normalizedValue,
     ),
     index("contact_business_idx").on(t.businessId),
+  ],
+);
+
+export const businessLinks = sqliteTable(
+  "business_links",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    type: text("type", {
+      enum: ["website", "instagram", "linkedin", "facebook", "x", "tiktok"],
+    }).notNull(),
+    url: text("url").notNull(),
+    normalizedUrl: text("normalized_url").notNull(),
+    sourceUrl: text("source_url").notNull(),
+    discoveredAt: text("discovered_at").notNull(),
+    verificationStatus: text("verification_status", {
+      enum: ["candidate", "confirmed", "rejected"],
+    })
+      .notNull()
+      .default("candidate"),
+    confidence: integer("confidence").notNull().default(0),
+    evidence: text("evidence").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("business_link_unique").on(t.businessId, t.normalizedUrl),
+    index("business_link_business_idx").on(t.businessId),
   ],
 );
 
@@ -295,5 +331,6 @@ export const businessRelations = relations(businesses, ({ one, many }) => ({
   audits: many(audits),
   drafts: many(outreachDrafts),
   contacts: many(contacts),
+  links: many(businessLinks),
   opportunity: one(opportunities),
 }));

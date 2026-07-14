@@ -4,13 +4,18 @@ import { db, isDatabaseConfigured } from "@/db";
 import {
   aiUsage,
   audits,
+  businessLinks,
   businesses,
   contacts,
   findings,
   opportunities,
 } from "@/db/schema";
 import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
-import { auditWebsite } from "@/lib/audit";
+import {
+  auditWebsite,
+  calculateOpportunityScore,
+  discoveredContactVerification,
+} from "@/lib/audit";
 import { analyzeFindings } from "@/lib/gemini";
 import { id, normalizeDomain, normalizePhone } from "@/lib/ids";
 import { getPlaceDetails, preferredPlacePhone } from "@/lib/places";
@@ -29,8 +34,15 @@ export async function POST(
     });
     if (!business)
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+    const existingContacts = await db
+      .select({ channel: contacts.channel })
+      .from(contacts)
+      .where(eq(contacts.businessId, businessId));
     let listingDetails: Awaited<ReturnType<typeof getPlaceDetails>> = null;
-    if (business.placeId && (!business.phone || !business.websiteUrl)) {
+    if (
+      business.placeId &&
+      (!business.phone || !business.websiteUrl || business.rating == null)
+    ) {
       try {
         listingDetails = await getPlaceDetails(business.placeId);
       } catch (detailsError) {
@@ -68,12 +80,27 @@ export async function POST(
         result.findings = result.findings.filter(
           (finding) => finding.code !== "no_public_contact",
         );
-        result.score = Math.max(0, result.score - 12);
+        result.score = Math.max(0, result.score - 8);
         result.summary = result.findings.length
           ? `${result.findings.length} evidence-backed website opportunities were found.`
           : "No strong website-rescue opportunity was detected.";
       }
     }
+    const rating = listingDetails?.rating ?? business.rating;
+    const userRatingCount =
+      listingDetails?.userRatingCount ?? business.userRatingCount;
+    result.score = calculateOpportunityScore({
+      websiteNeed: result.score,
+      contactChannels: [
+        ...result.contacts.map((contact) => contact.channel),
+        ...existingContacts.map((contact) => contact.channel),
+      ],
+      rating,
+      userRatingCount,
+      hasAddress: Boolean(business.address),
+      hasPlaceId: Boolean(business.placeId),
+      category: business.category,
+    });
     let summary = result.summary;
     let aiUsed = false;
     let aiResult = null;
@@ -134,22 +161,61 @@ export async function POST(
             ...item,
           })),
         );
-      for (const contact of result.contacts)
+      for (const contact of result.contacts) {
+        const verification = discoveredContactVerification(contact.channel);
+        const contactRecord = {
+          id: id("con"),
+          businessId,
+          ...contact,
+          ...verification,
+          discoveredAt: new Date().toISOString(),
+        };
+        const insert = tx.insert(contacts).values(contactRecord);
+        if (verification.verified)
+          await insert.onConflictDoUpdate({
+            target: [
+              contacts.businessId,
+              contacts.channel,
+              contacts.normalizedValue,
+            ],
+            set: {
+              sourceUrl: contact.sourceUrl,
+              verified: true,
+              isPrimary: true,
+              verificationMethod: "published_whatsapp",
+              updatedAt: new Date().toISOString(),
+            },
+          });
+        else await insert.onConflictDoNothing();
+      }
+      for (const link of result.links)
         await tx
-          .insert(contacts)
+          .insert(businessLinks)
           .values({
-            id: id("con"),
+            id: id("lnk"),
             businessId,
-            ...contact,
+            ...link,
             discoveredAt: new Date().toISOString(),
           })
-          .onConflictDoNothing();
+          .onConflictDoUpdate({
+            target: [businessLinks.businessId, businessLinks.normalizedUrl],
+            set: {
+              url: link.url,
+              sourceUrl: link.sourceUrl,
+              confidence: link.confidence,
+              evidence: link.evidence,
+              verificationStatus: "confirmed",
+              updatedAt: new Date().toISOString(),
+            },
+          });
       await tx
         .update(businesses)
         .set({
           score: result.score,
           stage,
           phone: normalizePhone(listingPhone) ?? business.phone,
+          rating: rating ?? business.rating,
+          userRatingCount: userRatingCount ?? business.userRatingCount,
           websiteUrl: websiteUrl ?? business.websiteUrl,
           normalizedDomain:
             normalizeDomain(websiteUrl) ?? business.normalizedDomain,
