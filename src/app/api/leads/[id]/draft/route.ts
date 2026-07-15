@@ -162,7 +162,7 @@ export async function POST(
           outputTokens += generated.usage?.candidatesTokenCount ?? 0;
           renderPitchVariants({
             businessName: business.name,
-            senderName: process.env.OUTREACH_SENDER_NAME?.trim() || "HUSTLE",
+            senderName: process.env.OUTREACH_SENDER_NAME,
             channel: input.channel,
             variants: generated.variants,
             validEvidenceCodes: validCodes,
@@ -181,7 +181,7 @@ export async function POST(
 
     const rendered = renderPitchVariants({
       businessName: business.name,
-      senderName: process.env.OUTREACH_SENDER_NAME?.trim() || "HUSTLE",
+      senderName: process.env.OUTREACH_SENDER_NAME,
       channel: input.channel,
       variants: parts,
       validEvidenceCodes: validCodes,

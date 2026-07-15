@@ -76,12 +76,15 @@ Evidence: ${JSON.stringify(sanitizePitchEvidence(input.evidence))}
 Aggregate style signals from earlier outreach: ${JSON.stringify(input.styleSignals)}
 
 Return exactly Short, Warm, and Specific variants in structured JSON.
+- Write like a thoughtful independent professional who has personally reviewed the available information. The tone should be polished, friendly, calm, and genuinely human.
+- Sound confident and helpful without being pushy, overly casual, stiff, or corporate. Use complete, conversational sentences that flow naturally when read aloud.
 - Short is the most compact. Warm is considerate without fake praise or familiarity. Specific leads with the strongest concrete issue and may mention one supporting issue.
 - Each variant must cite one primary evidence code and at most one supporting code from the supplied evidence.
-- observation states only what the audit directly established. Never invent benefits, customer behaviour, revenue, sales, prices, results, or compliments.
-- CTA must be one short permission-based question asking whether you may send or share a brief fix plan or homepage idea. Do not ask for a call.
+- observation should explain what was noticed respectfully and state only what the audit directly established. It should not sound accusatory or like a raw audit report. Never invent benefits, customer behaviour, revenue, sales, prices, results, or compliments.
+- CTA must be one natural, low-pressure question asking whether it would be helpful or useful to send or share a brief improvement outline, fix plan, or homepage idea. Do not ask for a call.
 - The first message must not mention deposits, payment terms, previews, discounts, or pricing.
-- Use plain natural language, contractions where useful, and normal punctuation. No slang, emojis, hype, em dashes, agency language, or AI phrases.
+- Use plain natural language, contractions where useful, and normal punctuation. Avoid abrupt fragments and canned sales language. No slang, emojis, hype, em dashes, agency language, or AI phrases.
+- Do not add a greeting, sign-off, sender name, company name, or brand name. Those details are handled outside this response.
 - Never include a business name, person name, address, location, URL, email address, phone number, profile handle, or contact detail.
 - Email subjects must describe the primary issue and be under 60 characters. For every other channel, subject must be null.
 - Use aggregate signals only as light style guidance. Do not recreate any earlier message.${repair}`;

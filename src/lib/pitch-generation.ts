@@ -103,13 +103,13 @@ function observationFor(evidence: PitchEvidence) {
     no_public_contact:
       "I checked the homepage and its contact pages but couldn't find a public contact method.",
     no_viewport:
-      "I checked the homepage and it is missing the setting browsers use for a proper mobile layout.",
+      "I noticed the homepage is missing the setting browsers use to display it properly on mobile screens.",
     slow_response:
-      "I checked the homepage and its initial response took longer than the audit threshold.",
+      "I checked the homepage and it took longer than expected to begin loading.",
     large_page:
-      "I checked the homepage and the page markup is unusually heavy before images load.",
+      "I checked the homepage and noticed the page is unusually heavy even before its images load.",
     no_https:
-      "I noticed the listed website opens without HTTPS.",
+      "I noticed the website is using an unsecured HTTP connection rather than HTTPS.",
     weak_title:
       "I checked the homepage and couldn't find a clear page title.",
     no_description:
@@ -126,12 +126,12 @@ function permissionCta(evidence: PitchEvidence, compact = false) {
     evidence.code === "healthy_website"
   ) {
     return compact
-      ? "Would you like me to send a simple homepage idea?"
-      : "Would you like me to send a brief homepage idea so you can see what I have in mind?";
+      ? "Would it be helpful if I sent over a simple homepage idea?"
+      : "Would it be useful if I sent over a brief homepage idea for you to consider?";
   }
   return compact
-    ? "Would you like me to send a brief fix plan?"
-    : "Would you like me to send a brief fix plan for that, with no obligation to use it?";
+    ? "Would it be helpful if I sent over a short improvement plan?"
+    : "Would it be useful if I sent over a brief outline of how this could be improved?";
 }
 
 export function buildFallbackPitchParts(
@@ -143,9 +143,7 @@ export function buildFallbackPitchParts(
   const support = evidence[1];
   const primaryObservation = observationFor(primary);
   const supportObservation = support
-    ? ` I also noticed ${observationFor(support)
-        .replace(/^I (?:checked|tried|noticed|opened) /i, "")
-        .replace(/^the /, "the ")}`
+    ? ` I also ${observationFor(support).replace(/^I\s+/i, "")}`
     : "";
   const subject =
     primary.code === "missing_website"
@@ -165,7 +163,7 @@ export function buildFallbackPitchParts(
     {
       label: "warm",
       subject: channel === "email" ? subject : null,
-      observation: `${primaryObservation} I thought it was worth mentioning directly rather than sending a generic template.`,
+      observation: `${primaryObservation} I wanted to mention it directly in case it's something you'd like to improve.`,
       cta: permissionCta(primary),
       evidenceCodes: [primary.code],
     },
@@ -181,23 +179,23 @@ export function buildFallbackPitchParts(
 
 function greeting(channel: OutreachChannel, businessName: string) {
   if (channel === "email")
-    return `Hi,\n\nI found ${businessName} through its public business listing.`;
+    return `Hi,\n\nI recently came across ${businessName} online.`;
   if (channel === "linkedin")
-    return `Hi, I came across ${businessName}'s business profile.`;
+    return `Hi, I recently came across ${businessName}'s LinkedIn profile.`;
   if (channel === "instagram")
-    return `Hi, I found ${businessName} through its public profile.`;
-  return `Hi, I came across ${businessName}'s public business listing.`;
+    return `Hi, I recently came across ${businessName}'s Instagram profile.`;
+  return `Hi, I recently came across ${businessName} online.`;
 }
 
 function optOut(channel: OutreachChannel) {
   return channel === "email"
-    ? "If this isn't relevant, just let me know and I won't follow up."
-    : "If not, just say and I won't follow up.";
+    ? "If this isn't a priority right now, no problem at all. Just let me know and I won't follow up."
+    : "If it isn't relevant right now, no problem at all. Just let me know and I won't follow up.";
 }
 
 export function renderPitchVariants(input: {
   businessName: string;
-  senderName: string;
+  senderName?: string;
   channel: OutreachChannel;
   variants: PitchVariantParts[];
   validEvidenceCodes: Set<string>;
@@ -214,8 +212,10 @@ export function renderPitchVariants(input: {
       variant.observation,
       variant.cta,
       optOut(input.channel),
-      input.senderName,
-    ].join(input.channel === "email" ? "\n\n" : "\n\n");
+      input.senderName?.trim() || null,
+    ]
+      .filter((section): section is string => Boolean(section))
+      .join("\n\n");
 
     if (body.length > CHANNEL_LIMITS[input.channel]) {
       throw new Error(
@@ -253,7 +253,10 @@ export function validatePitchParts(
       throw new Error(`${variant.label} observation has an invalid length`);
     if (variant.cta.length < 20 || variant.cta.length > 180)
       throw new Error(`${variant.label} CTA has an invalid length`);
-    if (!/[?]$/.test(variant.cta.trim()) || !/\b(send|share)\b/i.test(variant.cta))
+    if (
+      !/[?]$/.test(variant.cta.trim()) ||
+      !/\b(send|sent|share|shared)\b/i.test(variant.cta)
+    )
       throw new Error(`${variant.label} CTA must ask permission to send something`);
     if (variant.evidenceCodes.length < 1 || variant.evidenceCodes.length > 2)
       throw new Error(`${variant.label} must cite one or two findings`);

@@ -1,9 +1,5 @@
 import type { AuditFinding } from "./audit";
 
-function senderName() {
-  return process.env.OUTREACH_SENDER_NAME?.trim() || "HUSTLE";
-}
-
 export function buildPitch(input: {
   businessName: string;
   country: string;
@@ -37,11 +33,23 @@ export function buildHumanizedPitch(input: {
   observation: string;
   offer: string;
 }) {
-  const sender = senderName();
-  const body =
+  const sender = process.env.OUTREACH_SENDER_NAME?.trim();
+  const sections =
     input.channel === "whatsapp"
-      ? `Hi, I came across ${input.businessName} on Google Maps.\n\n${input.observation}\n\n${input.offer}\n\nWould you be open to that? If not, no problem. I won't follow up.\n\n${sender}`
-      : `Hi,\n\nI found ${input.businessName} through its Google listing. ${input.observation}\n\n${input.offer}\n\nWould it be useful if I sent that over? If not, just say and I won't follow up.\n\n${sender}`;
+      ? [
+          `Hi, I came across ${input.businessName} on Google Maps.`,
+          input.observation,
+          input.offer,
+          "Would you be open to that? If not, no problem. I won't follow up.",
+          sender,
+        ]
+      : [
+          `Hi,\n\nI found ${input.businessName} through its Google listing. ${input.observation}`,
+          input.offer,
+          "Would it be useful if I sent that over? If not, just say and I won't follow up.",
+          sender,
+        ];
+  const body = sections.filter(Boolean).join("\n\n");
   return {
     subject:
       input.channel === "email"

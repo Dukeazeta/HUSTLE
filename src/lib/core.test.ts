@@ -281,6 +281,7 @@ describe("pitch generation upgrade", () => {
       expect(variants.every((item) => item.body.includes("I won't follow up"))).toBe(
         true,
       );
+      expect(variants.every((item) => !item.body.endsWith("HUSTLE"))).toBe(true);
       if (channel === "email")
         expect(variants.every((item) => (item.subject?.length ?? 60) < 60)).toBe(
           true,
@@ -293,6 +294,28 @@ describe("pitch generation upgrade", () => {
     const variants = buildFallbackPitchParts([missingWebsite], "whatsapp");
     expect(variants[0].observation).toContain("couldn't find a website");
     expect(variants[0].observation).not.toMatch(/reviewed|checked the website/i);
+  });
+
+  it("only adds a personal sign-off when one is configured", () => {
+    const parts = buildFallbackPitchParts([missingWebsite], "email");
+    const withoutSignOff = renderPitchVariants({
+      businessName: "Example Salon",
+      channel: "email",
+      variants: parts,
+      validEvidenceCodes: new Set(["missing_website"]),
+    });
+    const withSignOff = renderPitchVariants({
+      businessName: "Example Salon",
+      senderName: "Duke",
+      channel: "email",
+      variants: parts,
+      validEvidenceCodes: new Set(["missing_website"]),
+    });
+
+    expect(withoutSignOff.every((item) => !item.body.endsWith("HUSTLE"))).toBe(
+      true,
+    );
+    expect(withSignOff.every((item) => item.body.endsWith("Duke"))).toBe(true);
   });
 
   it("rejects unsupported claims and evidence codes", () => {
@@ -332,6 +355,8 @@ describe("pitch generation upgrade", () => {
     expect(prompt).not.toContain("https://acme.example");
     expect(prompt).not.toContain("owner@acme.example");
     expect(prompt).not.toContain("+234 801 234 5678");
+    expect(prompt).toContain("polished, friendly, calm, and genuinely human");
+    expect(prompt).toContain("Do not add a greeting, sign-off");
   });
 
   it("learns only aggregate style measurements", () => {
