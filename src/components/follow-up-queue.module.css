@@ -1,0 +1,242 @@
+.queue {
+  --blue: #0052ff;
+  --blue-active: #003ecc;
+  --ink: #0a0b0d;
+  --body: #5b616e;
+  --muted: #7c828a;
+  --hairline: #dee1e6;
+  --hairline-soft: #eef0f3;
+  --canvas: #ffffff;
+  --surface: #eef0f3;
+
+  container-type: inline-size;
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 24px;
+  font-family: var(--font-inter), Inter, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) minmax(116px, auto) auto;
+  gap: 16px;
+  align-items: center;
+  min-height: 88px;
+  padding: 16px 24px;
+  transition: background-color 140ms ease;
+}
+
+.row + .row {
+  border-top: 1px solid var(--hairline-soft);
+}
+
+.row:hover {
+  background: #f7f7f7;
+}
+
+.iconPlate {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--ink);
+  background: var(--surface);
+  border-radius: 9999px;
+}
+
+.iconPlate svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.8;
+}
+
+.identity {
+  min-width: 0;
+}
+
+.titleLine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.titleLine strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titleLine span {
+  padding: 4px 10px;
+  color: var(--ink);
+  background: var(--surface);
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.identity p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 6px 0 0;
+  color: var(--body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.due {
+  display: grid;
+  gap: 3px;
+  justify-items: end;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.due time {
+  color: var(--ink);
+  font-family: var(--font-geist-mono), "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.action {
+  min-width: 98px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 18px;
+  color: #ffffff;
+  background: var(--blue);
+  border-radius: 100px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 140ms ease;
+}
+
+.action:hover {
+  background: var(--blue-active);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.action svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  stroke-width: 1.8;
+}
+
+.empty {
+  min-height: 144px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px 24px;
+}
+
+.empty h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.empty p {
+  margin: 5px 0 0;
+  color: var(--body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.compact .row {
+  min-height: 76px;
+  padding: 12px 20px;
+}
+
+.compact .identity p {
+  -webkit-line-clamp: 1;
+}
+
+@container (max-width: 640px) {
+  .row {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 12px 14px;
+    padding: 20px;
+  }
+
+  .due,
+  .action {
+    grid-column: 2;
+  }
+
+  .due {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    padding-top: 4px;
+  }
+
+  .action {
+    width: 100%;
+  }
+
+  .compact .row {
+    padding: 16px;
+  }
+}
+
+@container (max-width: 400px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+
+  .iconPlate,
+  .due,
+  .action {
+    grid-column: 1;
+  }
+
+  .due {
+    padding-top: 8px;
+    border-top: 1px solid var(--hairline-soft);
+  }
+
+  .empty {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row,
+  .action {
+    transition: none;
+  }
+}

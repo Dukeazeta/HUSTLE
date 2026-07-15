@@ -9,7 +9,7 @@ import {
   opportunities,
   outreachDrafts,
 } from "@/db/schema";
-import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
 import { PIPELINE_STAGES } from "@/lib/constants";
 import { id, normalizePhone } from "@/lib/ids";
 import { canTransition, REMINDER_CANCEL_STAGES } from "@/lib/workflow";
@@ -42,7 +42,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireOwner())) return unauthorized();
+  if (!(await requireUser())) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const businessId = (await params).id;

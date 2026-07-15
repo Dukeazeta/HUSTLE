@@ -6,11 +6,12 @@ import {
   audits,
   businessLinks,
   businesses,
+  campaigns,
   contacts,
   findings,
   opportunities,
 } from "@/db/schema";
-import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
 import {
   auditWebsite,
   calculateOpportunityScore,
@@ -18,6 +19,10 @@ import {
 } from "@/lib/audit";
 import { analyzeFindings } from "@/lib/gemini";
 import { id, normalizeDomain, normalizePhone } from "@/lib/ids";
+import {
+  packageKeyFromName,
+  packagePricesFromCampaign,
+} from "@/lib/markets";
 import { getPlaceDetails, preferredPlacePhone } from "@/lib/places";
 import { preserveStageAfterAudit } from "@/lib/workflow";
 
@@ -25,7 +30,7 @@ export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireOwner())) return unauthorized();
+  if (!(await requireUser())) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const businessId = (await params).id;
@@ -34,6 +39,11 @@ export async function POST(
     });
     if (!business)
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+    const campaign = await db.query.campaigns.findFirst({
+      where: eq(campaigns.id, business.campaignId),
+    });
+    if (!campaign)
+      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     const existingContacts = await db
       .select({ channel: contacts.channel })
       .from(contacts)
@@ -222,7 +232,9 @@ export async function POST(
           updatedAt: new Date().toISOString(),
         })
         .where(eq(businesses.id, businessId));
-      if (result.score >= 60)
+      if (result.score >= 60) {
+        const packagePrices = packagePricesFromCampaign(campaign);
+        const packageKey = packageKeyFromName(aiResult?.recommendedPackage);
         await tx
           .insert(opportunities)
           .values({
@@ -230,9 +242,11 @@ export async function POST(
             businessId,
             stage: "qualified",
             packageName: aiResult?.recommendedPackage,
-            currency: business.country === "NG" ? "NGN" : "GBP",
+            currency: campaign.currency,
+            valueMinor: packagePrices[packageKey],
           })
           .onConflictDoNothing({ target: opportunities.businessId });
+      }
     });
     return NextResponse.json({
       audit: { id: auditId, ...result, summary, aiUsed },

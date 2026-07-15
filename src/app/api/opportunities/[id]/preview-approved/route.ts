@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/db";
 import { activities, businesses, opportunities } from "@/db/schema";
-import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
 import { id } from "@/lib/ids";
 
 export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireOwner())) return unauthorized();
+  if (!(await requireUser())) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const opportunityId = (await params).id;

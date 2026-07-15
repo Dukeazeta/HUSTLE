@@ -16,9 +16,7 @@ export function buildPitch(input: {
     input.pitchAngle?.trim() ||
     `I had a quick look at the website on your Google listing and noticed ${issue}.`;
   const offer =
-    input.country === "NG"
-      ? "I fix websites for small businesses. I can sketch out how I'd sort this one out, then you can decide if it is worth doing."
-      : "I work on websites for small businesses. I can send a short note on how I'd fix it and what it would cost, if that would be useful.";
+    "I work on websites for small businesses. I can send a short outline of how I'd improve this one, then you can decide whether it would be useful.";
   return buildHumanizedPitch({
     businessName: input.businessName,
     channel: input.channel,

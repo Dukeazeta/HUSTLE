@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import type { AuditFinding } from "./audit";
 import type { OutreachChannel } from "./constants";
+import { countryName } from "./markets";
 import {
   sanitizePitchEvidence,
   type PitchEvidence,
@@ -65,7 +66,7 @@ export function buildPitchPrompt(input: {
   const category = safeCategories.has(input.category)
     ? input.category.replaceAll("_", " ")
     : "local business";
-  const country = input.country === "NG" ? "Nigeria" : "the UK";
+  const country = countryName(input.country);
   const repair = input.repairReason
     ? `\nThe previous response was rejected for this reason: ${input.repairReason}. Correct it without adding new facts.`
     : "";

@@ -9,12 +9,16 @@ import {
   outreachDrafts,
   payments,
 } from "@/db/schema";
-import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
 import { id } from "@/lib/ids";
+import { isCurrencyCode, normalizeCurrencyCode } from "@/lib/markets";
 
 const inputSchema = z.object({
   amountMinor: z.number().int().positive(),
-  currency: z.enum(["NGN", "GBP"]),
+  currency: z
+    .string()
+    .transform(normalizeCurrencyCode)
+    .refine(isCurrencyCode, { message: "Select a valid currency" }),
   reference: z.string().max(120).optional(),
   paidAt: z.string().datetime().optional(),
 });
@@ -22,7 +26,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireOwner())) return unauthorized();
+  if (!(await requireUser())) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const opportunityId = (await params).id;

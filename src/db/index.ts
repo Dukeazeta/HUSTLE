@@ -3,6 +3,8 @@ import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
 export function isDatabaseConfigured() {
+  if (process.env.DEMO_MODE === "true") return false;
+
   const url = process.env.TURSO_CONNECTION_URL;
   return Boolean(
     url && (url.startsWith("file:") || process.env.TURSO_AUTH_TOKEN),

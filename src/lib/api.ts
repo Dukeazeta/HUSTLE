@@ -1,16 +1,15 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-export async function requireOwner() {
+export async function requireUser() {
   if (
     process.env.VERCEL_ENV === "production" &&
     process.env.DEMO_MODE === "true"
   )
     throw new Error("DEMO_MODE cannot be enabled in production");
-  if (process.env.DEMO_MODE === "true") return { email: "demo@hustle.local" };
   const session = await auth();
   const email = session?.user?.email?.toLowerCase();
-  if (!email || email !== process.env.OWNER_EMAIL?.toLowerCase()) return null;
+  if (!email) return null;
   return { email };
 }
 

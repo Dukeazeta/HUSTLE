@@ -1,23 +1,15 @@
 import Link from "next/link";
 import { and, desc, eq, isNotNull, lte } from "drizzle-orm";
-import {
-  ArrowRight,
-  CalendarDays,
-  CheckCircle2,
-  CircleDollarSign,
-  Clock3,
-  Radar,
-  ScanSearch,
-  Send,
-  Sparkles,
-} from "lucide-react";
+import { ArrowUpRight, MapPin, Target } from "lucide-react";
 import { db, isDatabaseConfigured } from "@/db";
 import { businesses, campaigns, outreachDrafts } from "@/db/schema";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppShell } from "@/components/layout/app-shell";
 import { CampaignCreator } from "@/components/campaign-creator";
-import { CampaignCard } from "@/components/campaign-card";
 import { FollowUpQueue } from "@/components/follow-up-queue";
 import { demoCampaigns, demoLeads } from "@/lib/demo-data";
+import { countryName } from "@/lib/markets";
+import styles from "./page.module.css";
+
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
@@ -70,6 +62,7 @@ export default async function Home() {
         )
         .orderBy(outreachDrafts.followUpDueAt)
     : [];
+
   const qualified = leadRows.filter((lead) => lead.score >= 60).length;
   const contacted = leadRows.filter((lead) =>
     [
@@ -83,167 +76,163 @@ export default async function Home() {
     ].includes(lead.stage),
   ).length;
   const won = leadRows.filter((lead) => lead.stage === "won").length;
-  const queue = [...leadRows].sort((a, b) => b.score - a.score).slice(0, 5);
+  const queue = [...leadRows]
+    .filter((lead) => !lead.suppressed && lead.stage !== "won")
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+  const nextLead = queue[0];
+  const latestCampaign = campaignRows[0];
+  const today = new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date());
+
   return (
-    <div className="app-frame">
-      <AppSidebar qualified={qualified} />
-      <main className="command-main">
-        <header className="command-header">
-          <div>
-            <span className="section-kicker">Tuesday · 14 July 2026</span>
-            <h1>Command centre</h1>
-            <p>Move the right lead forward, one clear action at a time.</p>
-          </div>
-          <div className="header-actions">
-            <button className="date-chip">
-              <CalendarDays size={17} />
-              14 July 2026
-            </button>
+    <AppShell active="command">
+      <section className={styles.hero}>
+        <div className={styles.heroCopy}>
+          <span>{today}</span>
+          <h1>Move the right opportunity forward.</h1>
+          <p>
+            HUSTLE keeps discovery, evidence and manual outreach in one clear
+            private workspace.
+          </p>
+          <div className={styles.heroAction}>
             <CampaignCreator configured={configured} />
+            <Link href="/leads">
+              View pipeline <ArrowUpRight aria-hidden="true" />
+            </Link>
           </div>
-        </header>
-        <section className="today-section">
-          <div className="section-title-row">
-            <div>
-              <span className="section-kicker">Today</span>
-              <h2>What needs your attention</h2>
-            </div>
-            <small>{queue.length} priority leads</small>
+        </div>
+
+        <div className={styles.heroStack} aria-label="Pipeline highlight">
+          <div className={styles.heroCard}>
+            <span>Next best lead</span>
+            {nextLead ? (
+              <>
+                <strong>{nextLead.name}</strong>
+                <p>
+                  <MapPin aria-hidden="true" />
+                  {nextLead.city}, {countryName(nextLead.country)}
+                </p>
+                <div>
+                  <span>Opportunity score</span>
+                  <b>{nextLead.score}</b>
+                </div>
+                <Link href={`/leads/${nextLead.id}`}>
+                  Review lead <ArrowUpRight aria-hidden="true" />
+                </Link>
+              </>
+            ) : (
+              <p>Create a campaign to begin finding opportunities.</p>
+            )}
           </div>
-          <div className="attention-list">
-            {queue.map((lead, index) => (
-              <article key={lead.id}>
-                <span
-                  className={`attention-icon ${lead.stage === "discovered" ? "amber" : "green"}`}
-                >
-                  {lead.stage === "discovered" ? <ScanSearch /> : <Send />}
-                </span>
-                <div className="attention-action">
-                  <b>
-                    {lead.stage === "discovered"
-                      ? "Audit due"
-                      : lead.stage === "pitch_ready"
-                        ? "Pitch ready"
-                        : "Review lead"}
-                  </b>
-                  <span>{lead.name}</span>
+          <div className={styles.heroMiniCard}>
+            <span>Qualified</span>
+            <strong>{qualified}</strong>
+            <small>of {leadRows.length} recent leads</small>
+          </div>
+        </div>
+      </section>
+
+      <section className={styles.snapshot} aria-label="Pipeline snapshot">
+        <Snapshot label="Recent leads" value={leadRows.length} />
+        <Snapshot label="Qualified" value={qualified} />
+        <Snapshot label="Contacted" value={contacted} />
+        <Snapshot label="Clients won" value={won} />
+      </section>
+
+      <section className={styles.priority} aria-labelledby="priority-title">
+        <div className={styles.sectionHeader}>
+          <div>
+            <span>Next actions</span>
+            <h2 id="priority-title">Priority leads</h2>
+          </div>
+          <Link href="/leads">View all leads</Link>
+        </div>
+
+        <div className={styles.assetList}>
+          {queue.length ? (
+            queue.map((lead, index) => (
+              <article key={lead.id} className={styles.assetRow}>
+                <span className={styles.assetIcon}>{index + 1}</span>
+                <div className={styles.assetIdentity}>
+                  <strong>{lead.name}</strong>
+                  <span>{lead.category.replaceAll("_", " ")}</span>
                 </div>
-                <div className="attention-market">
-                  {lead.city}, {lead.country}
+                <div className={styles.assetMarket}>
+                  <span>Market</span>
+                  <strong>
+                    {lead.city}, {countryName(lead.country)}
+                  </strong>
                 </div>
-                <div className="attention-score">
+                <div className={styles.assetScore}>
                   <span>Score</span>
-                  <b>
-                    {lead.score}
-                    <small>/100</small>
-                  </b>
+                  <strong>{lead.score}</strong>
                 </div>
-                <Link
-                  className={index === 0 ? "primary-row-action" : "row-action"}
-                  href={`/leads/${lead.id}`}
-                >
-                  {index === 0 ? "Review next lead" : "Review"}
-                  <ArrowRight size={15} />
+                <span className={styles.stage}>
+                  {lead.stage.replaceAll("_", " ")}
+                </span>
+                <Link href={`/leads/${lead.id}`} aria-label={`Review ${lead.name}`}>
+                  Review <ArrowUpRight aria-hidden="true" />
                 </Link>
               </article>
-            ))}
-          </div>
-        </section>
-        <section className="metric-strip">
-          <Metric
-            icon={<Radar />}
-            label="Leads found"
-            value={leadRows.length}
-            note="Across both markets"
-          />
-          <Metric
-            icon={<CheckCircle2 />}
-            label="Qualified"
-            value={qualified}
-            note={`${leadRows.length ? Math.round((qualified / leadRows.length) * 100) : 0}% qualification rate`}
-          />
-          <Metric
-            icon={<Send />}
-            label="Contacted"
-            value={contacted}
-            note="Manual outreach only"
-          />
-          <Metric
-            icon={<CircleDollarSign />}
-            label="Clients won"
-            value={won}
-            note="Payment recorded"
-          />
-        </section>
-        <div className="overview-grid">
-          <section>
-            <div className="section-title-row">
-              <div>
-                <span className="section-kicker">Prospecting</span>
-                <h2>Latest campaign</h2>
-              </div>
-              <Link href="/campaigns" className="view-all-link">
-                View all campaigns <ArrowRight size={14} />
-              </Link>
-            </div>
-            <div className="campaign-grid">
-              {campaignRows.slice(0, 1).map((campaign) => (
-                <CampaignCard
-                  key={campaign.id}
-                  campaign={campaign}
-                  demo={!configured}
-                />
-              ))}
-            </div>
-          </section>
-          <section>
-            <div className="section-title-row">
-              <div>
-                <span className="section-kicker">Reminders</span>
-                <h2>Follow-ups due</h2>
-              </div>
-              <Link href="/follow-ups" className="view-all-link">
-                View all follow-ups <Clock3 size={14} />
-              </Link>
-            </div>
-            <FollowUpQueue reminders={reminders.slice(0, 3)} />
-          </section>
+            ))
+          ) : (
+            <div className={styles.empty}>No leads need attention right now.</div>
+          )}
         </div>
-        <section className="trust-banner">
-          <span>
-            <Sparkles />
-          </span>
-          <div>
-            <b>Preview first. Payment before handover.</b>
-            <small>
-              Production access, source and credentials unlock only after full
-              payment.
-            </small>
+      </section>
+
+      <div className={styles.lowerGrid}>
+        <section className={styles.featureCard}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <span>Discovery</span>
+              <h2>Latest campaign</h2>
+            </div>
+            <Link href="/campaigns">All campaigns</Link>
           </div>
+          {latestCampaign ? (
+            <div className={styles.campaign}>
+              <span>
+                <Target aria-hidden="true" />
+              </span>
+              <div>
+                <strong>{latestCampaign.name}</strong>
+                <p>
+                  {latestCampaign.city}, {countryName(latestCampaign.country)} ·{" "}
+                  {latestCampaign.category.replaceAll("_", " ")}
+                </p>
+              </div>
+              <b>{latestCampaign.status}</b>
+            </div>
+          ) : (
+            <div className={styles.empty}>No campaigns yet.</div>
+          )}
         </section>
-      </main>
-    </div>
+
+        <section className={styles.featureCard}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <span>Reminders</span>
+              <h2>Follow-ups due</h2>
+            </div>
+            <Link href="/follow-ups">Open queue</Link>
+          </div>
+          <FollowUpQueue reminders={reminders.slice(0, 3)} compact />
+        </section>
+      </div>
+    </AppShell>
   );
 }
-function Metric({
-  icon,
-  label,
-  value,
-  note,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  note: string;
-}) {
+
+function Snapshot({ label, value }: { label: string; value: number }) {
   return (
-    <article>
-      <span>{icon}</span>
-      <div>
-        <small>{label}</small>
-        <strong>{value}</strong>
-        <p>{note}</p>
-      </div>
-    </article>
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }

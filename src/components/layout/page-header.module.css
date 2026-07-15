@@ -1,0 +1,247 @@
+.header {
+  --brand-blue: #0052ff;
+  --ink: #0a0b0d;
+  --body: #5b616e;
+  --muted: #7c828a;
+  --hairline: #dee1e6;
+  --surface-strong: #eef0f3;
+  display: grid;
+  gap: 32px;
+  margin-bottom: clamp(40px, 5vw, 64px);
+  font-family:
+    var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+.primaryRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 48px;
+}
+
+.copy {
+  min-width: 0;
+}
+
+.eyebrow {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  margin-bottom: 16px;
+  border-radius: 100px;
+  background: var(--surface-strong);
+  padding: 4px 12px;
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.copy h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(2.25rem, 5vw, 3.25rem);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+
+.copy p {
+  max-width: 680px;
+  margin: 18px 0 0;
+  color: var(--body);
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  min-height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.actions > :global(button),
+.actions > :global(a) {
+  min-height: 44px;
+  border-radius: 100px !important;
+}
+
+.actions > :global(button) {
+  border-color: var(--brand-blue) !important;
+  background: var(--brand-blue) !important;
+  color: #fff !important;
+  padding-inline: 20px !important;
+}
+
+.actions > :global(button):hover {
+  background: #003ecc !important;
+}
+
+.actions > :global(:not(button):not(a)) {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 100px;
+  background: var(--surface-strong);
+  padding: 10px 16px;
+}
+
+.actions :global(button):focus-visible,
+.actions :global(a):focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 3px;
+}
+
+.leadContext {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  gap: 20px;
+  border-block: 1px solid var(--hairline);
+  padding-block: 14px;
+}
+
+.leadGlyph {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  border-radius: 9999px;
+  background: var(--surface-strong);
+  color: var(--brand-blue);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.leadIdentity {
+  display: grid;
+  min-width: 180px;
+  gap: 2px;
+}
+
+.leadIdentity strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leadIdentity span {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  text-transform: capitalize;
+}
+
+.contextItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--body);
+  font-size: 0.875rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.contextItem svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.7;
+}
+
+.score {
+  color: var(--ink);
+  font-family: var(--font-geist-mono), "Geist Mono", monospace;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.stage {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  margin-left: auto;
+  border-radius: 100px;
+  background: var(--surface-strong);
+  padding: 6px 12px;
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .primaryRow {
+    align-items: flex-start;
+    gap: 32px;
+  }
+
+  .leadContext {
+    flex-wrap: wrap;
+    gap: 12px 18px;
+  }
+
+  .leadIdentity {
+    flex: 1 1 calc(100% - 60px);
+  }
+
+  .stage {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .header {
+    gap: 24px;
+    margin-bottom: 40px;
+  }
+
+  .primaryRow {
+    display: grid;
+    gap: 24px;
+  }
+
+  .copy h1 {
+    font-size: clamp(2.25rem, 12vw, 2.75rem);
+  }
+
+  .copy p {
+    margin-top: 14px;
+  }
+
+  .actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .actions > :global(button),
+  .actions > :global(a),
+  .actions > :global(:not(button):not(a)) {
+    max-width: 100%;
+  }
+
+  .contextItem,
+  .score {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header *,
+  .header *::before,
+  .header *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

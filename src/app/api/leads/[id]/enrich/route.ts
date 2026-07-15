@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, count, desc, eq, gte, ne } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/db";
 import { activities, businessLinks, businesses } from "@/db/schema";
-import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
 import { id } from "@/lib/ids";
 import { searchPublicBusinessPresence } from "@/lib/web-enrichment";
 
@@ -10,7 +10,7 @@ export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireOwner())) return unauthorized();
+  if (!(await requireUser())) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   if (!process.env.BRAVE_SEARCH_API_KEY) return notConfigured("Brave Search");
 

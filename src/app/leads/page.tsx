@@ -1,10 +1,12 @@
 import { desc, eq } from "drizzle-orm";
-import { Search } from "lucide-react";
+import { BriefcaseBusiness } from "lucide-react";
 import { db, isDatabaseConfigured } from "@/db";
 import { businesses, campaigns } from "@/db/schema";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppShell } from "@/components/layout/app-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { LeadTable } from "@/components/lead-table";
 import { demoLeads } from "@/lib/demo-data";
+import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -32,22 +34,21 @@ export default async function LeadsPage() {
   const qualified = leads.filter((lead) => lead.score >= 60).length;
 
   return (
-    <div className="app-frame">
-      <AppSidebar qualified={qualified} active="leads" />
-      <main className="route-main">
-        <header className="route-header">
-          <div>
-            <span className="section-kicker">Pipeline</span>
-            <h1>Leads</h1>
-            <p>Search, filter and move every opportunity forward.</p>
+    <AppShell active="leads">
+      <PageHeader
+        eyebrow="Pipeline"
+        title="Leads"
+        description="Find the right business quickly, then continue its next workflow step."
+        actions={
+          <div className={styles.summary}>
+            <BriefcaseBusiness aria-hidden="true" />
+            <span>
+              <strong>{leads.length}</strong> recent · {qualified} qualified
+            </span>
           </div>
-          <div className="route-summary">
-            <Search />
-            <span>{leads.length} total leads</span>
-          </div>
-        </header>
-        <LeadTable leads={leads} demo={!configured} />
-      </main>
-    </div>
+        }
+      />
+      <LeadTable leads={leads} demo={!configured} />
+    </AppShell>
   );
 }

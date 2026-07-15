@@ -5,22 +5,23 @@ import {
   activities,
   businessLinks,
   businesses,
+  campaigns,
   contacts,
   outreachDrafts,
   pitchGenerations,
   pitchVariants,
   suppressions,
 } from "@/db/schema";
-import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
 import { withDatabaseRetry } from "@/lib/db-retry";
 import { id } from "@/lib/ids";
-import { ukOutreachBlockReason } from "@/lib/outreach-compliance";
+import { outreachBlockReason } from "@/lib/outreach-compliance";
 
 export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireOwner())) return unauthorized();
+  if (!(await requireUser())) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
 
   try {
@@ -31,6 +32,7 @@ export async function POST(
           variant: pitchVariants,
           generation: pitchGenerations,
           business: businesses,
+          campaign: campaigns,
         })
         .from(pitchVariants)
         .innerJoin(
@@ -41,6 +43,7 @@ export async function POST(
           businesses,
           eq(pitchGenerations.businessId, businesses.id),
         )
+        .innerJoin(campaigns, eq(businesses.campaignId, campaigns.id))
         .where(eq(pitchVariants.id, variantId))
         .limit(1),
     );
@@ -48,7 +51,13 @@ export async function POST(
       return NextResponse.json({ error: "Pitch variant not found" }, { status: 404 });
     if (record.business.suppressed)
       return NextResponse.json({ error: "Lead is suppressed" }, { status: 409 });
-    const complianceError = ukOutreachBlockReason(record.business);
+    const complianceError = outreachBlockReason({
+      ...record.business,
+      channel: record.generation.channel,
+      campaignComplianceReviewedAt: record.campaign.complianceReviewedAt,
+      campaignComplianceNote: record.campaign.complianceNote,
+      approvedChannels: record.campaign.approvedChannels,
+    });
     if (complianceError)
       return NextResponse.json({ error: complianceError }, { status: 409 });
     const target = await loadChannelTarget(

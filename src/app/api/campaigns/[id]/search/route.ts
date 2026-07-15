@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/db";
 import { businesses, campaigns, contacts } from "@/db/schema";
-import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
 import { id, normalizeDomain, normalizePhone } from "@/lib/ids";
 import { preferredPlacePhone, searchPlaces } from "@/lib/places";
 
@@ -10,7 +10,7 @@ export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireOwner())) return unauthorized();
+  if (!(await requireUser())) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const campaignId = (await params).id;

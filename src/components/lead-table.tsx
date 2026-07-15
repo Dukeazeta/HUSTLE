@@ -1,13 +1,19 @@
 "use client";
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   ArrowUpRight,
   ExternalLink,
-  Search,
+  LoaderCircle,
+  RotateCcw,
   ScanSearch,
-  SlidersHorizontal,
+  Search,
+  ShieldOff,
 } from "lucide-react";
+import { countryName } from "@/lib/markets";
+import styles from "./lead-table.module.css";
+
 type Lead = {
   id: string;
   name: string;
@@ -20,154 +26,315 @@ type Lead = {
   campaignName: string | null;
   suppressed: boolean;
 };
+
+type Notice = {
+  tone: "info" | "success" | "error";
+  message: string;
+};
+
+function readableLabel(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 export function LeadTable({ leads, demo }: { leads: Lead[]; demo: boolean }) {
   const [query, setQuery] = useState("");
   const [market, setMarket] = useState("all");
   const [stage, setStage] = useState("all");
   const [running, setRunning] = useState("");
-  const [notice, setNotice] = useState("");
-  const filtered = useMemo(
+  const [notice, setNotice] = useState<Notice | null>(null);
+
+  const markets = useMemo(
     () =>
-      leads.filter(
-        (lead) =>
-          (!query ||
-            `${lead.name} ${lead.city} ${lead.category}`
-              .toLowerCase()
-              .includes(query.toLowerCase())) &&
-          (market === "all" || lead.country === market) &&
-          (stage === "all" || lead.stage === stage),
+      [...new Set(leads.map((lead) => lead.country))].sort((left, right) =>
+        countryName(left).localeCompare(countryName(right)),
       ),
-    [leads, query, market, stage],
+    [leads],
   );
+
+  const stages = useMemo(
+    () =>
+      [...new Set(leads.map((lead) => lead.stage))].sort((left, right) =>
+        readableLabel(left).localeCompare(readableLabel(right)),
+      ),
+    [leads],
+  );
+
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+
+    return leads.filter((lead) => {
+      const searchableText = [
+        lead.name,
+        lead.city,
+        lead.category,
+        lead.campaignName ?? "",
+        countryName(lead.country),
+      ]
+        .join(" ")
+        .toLocaleLowerCase();
+
+      return (
+        (!normalizedQuery || searchableText.includes(normalizedQuery)) &&
+        (market === "all" || lead.country === market) &&
+        (stage === "all" || lead.stage === stage)
+      );
+    });
+  }, [leads, market, query, stage]);
+
+  const filtersActive =
+    Boolean(query.trim()) || market !== "all" || stage !== "all";
+
+  function clearFilters() {
+    setQuery("");
+    setMarket("all");
+    setStage("all");
+  }
+
   async function audit(id: string) {
-    if (demo) return setNotice("Demo data is read-only.");
+    if (demo) {
+      setNotice({ tone: "info", message: "Demo data is read-only." });
+      return;
+    }
+
     setRunning(id);
-    setNotice("");
+    setNotice(null);
+
     try {
       const response = await fetch(`/api/leads/${id}/audit`, {
         method: "POST",
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      setNotice(`Audit complete: ${data.audit.score}/100`);
-      setTimeout(() => location.reload(), 500);
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Audit failed");
+      }
+
+      setNotice({
+        tone: "success",
+        message: `Audit complete: ${data.audit.score}/100`,
+      });
+      window.setTimeout(() => location.reload(), 500);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Audit failed");
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Audit failed",
+      });
     } finally {
       setRunning("");
     }
   }
+
   return (
-    <div className="lead-table-shell">
-      <div className="table-toolbar">
-        <label>
-          <Search />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search leads…"
-          />
+    <section className={styles.shell} aria-label="Lead pipeline">
+      <div className={styles.toolbar}>
+        <label className={styles.searchField}>
+          <span>Search leads</span>
+          <span className={styles.searchControl}>
+            <Search aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Business, city or campaign"
+            />
+          </span>
         </label>
-        <select value={market} onChange={(e) => setMarket(e.target.value)}>
-          <option value="all">All markets</option>
-          <option value="NG">Nigeria</option>
-          <option value="UK">United Kingdom</option>
-        </select>
-        <select value={stage} onChange={(e) => setStage(e.target.value)}>
-          <option value="all">All stages</option>
-          {[...new Set(leads.map((lead) => lead.stage))].map((item) => (
-            <option key={item} value={item}>
-              {item.replaceAll("_", " ")}
-            </option>
-          ))}
-        </select>
-        <button className="filter-button">
-          <SlidersHorizontal />
-          More filters
-        </button>
+
+        <label className={styles.filterField}>
+          <span>Country</span>
+          <select
+            value={market}
+            onChange={(event) => setMarket(event.target.value)}
+          >
+            <option value="all">All countries</option>
+            {markets.map((country) => (
+              <option key={country} value={country}>
+                {countryName(country)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className={styles.filterField}>
+          <span>Stage</span>
+          <select
+            value={stage}
+            onChange={(event) => setStage(event.target.value)}
+          >
+            <option value="all">All stages</option>
+            {stages.map((item) => (
+              <option key={item} value={item}>
+                {readableLabel(item)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {filtersActive && (
+          <button
+            type="button"
+            className={styles.clearButton}
+            onClick={clearFilters}
+          >
+            <RotateCcw aria-hidden="true" />
+            Clear
+          </button>
+        )}
       </div>
-      {notice && <div className="inline-notice">{notice}</div>}
-      <div className="table-scroll">
-        <table className="lead-table">
-          <thead>
-            <tr>
-              <th>Business</th>
-              <th>Market</th>
-              <th>Opportunity score</th>
-              <th>Stage</th>
-              <th>Campaign</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((lead) => (
-              <tr key={lead.id}>
-                <td>
-                  <div className="lead-name-cell">
-                    <span>{lead.name.slice(0, 2).toUpperCase()}</span>
+
+      <div className={styles.summary} role="status" aria-live="polite">
+        <span>
+          Showing <strong>{filtered.length}</strong> of {leads.length} leads
+        </span>
+      </div>
+
+      {notice && (
+        <div
+          className={styles.notice}
+          data-tone={notice.tone}
+          role={notice.tone === "error" ? "alert" : "status"}
+        >
+          {notice.message}
+        </div>
+      )}
+
+      {filtered.length > 0 ? (
+        <div className={styles.list}>
+          <div className={styles.listHeader} aria-hidden="true">
+            <span>Business</span>
+            <span>Market</span>
+            <span>Score</span>
+            <span>Stage</span>
+            <span>Campaign</span>
+            <span>Actions</span>
+          </div>
+
+          <ul>
+            {filtered.map((lead) => {
+              const isRunning = running === lead.id;
+
+              return (
+                <li
+                  key={lead.id}
+                  className={styles.leadRow}
+                  data-suppressed={lead.suppressed || undefined}
+                >
+                  <div className={styles.businessCell}>
+                    <span className={styles.monogram} aria-hidden="true">
+                      {lead.name.slice(0, 2).toUpperCase()}
+                    </span>
                     <div>
-                      <Link href={`/leads/${lead.id}`}>{lead.name}</Link>
-                      <small>{lead.category.replaceAll("_", " ")}</small>
+                      <div className={styles.businessHeading}>
+                        <Link href={`/leads/${lead.id}`}>{lead.name}</Link>
+                        {lead.suppressed && (
+                          <span className={styles.suppressedBadge}>
+                            <ShieldOff aria-hidden="true" />
+                            Suppressed
+                          </span>
+                        )}
+                      </div>
+                      <span className={styles.category}>
+                        {readableLabel(lead.category)}
+                      </span>
                     </div>
                   </div>
-                </td>
-                <td>
-                  <b className="country-pill">{lead.country}</b>
-                  {lead.city}
-                </td>
-                <td>
-                  <div className="score-cell">
-                    <b>{lead.score}</b>
-                    <span>
-                      <i style={{ width: `${lead.score}%` }} />
+
+                  <div className={styles.dataCell}>
+                    <span className={styles.mobileLabel}>Market</span>
+                    <strong>{countryName(lead.country)}</strong>
+                    <span>{lead.city}</span>
+                  </div>
+
+                  <div className={styles.dataCell}>
+                    <span className={styles.mobileLabel}>Score</span>
+                    <div
+                      className={styles.score}
+                      aria-label={`Opportunity score ${lead.score} out of 100`}
+                    >
+                      <strong>{lead.score}</strong>
+                      <span aria-hidden="true">/100</span>
+                    </div>
+                  </div>
+
+                  <div className={styles.dataCell}>
+                    <span className={styles.mobileLabel}>Stage</span>
+                    <span className={styles.stageBadge} data-stage={lead.stage}>
+                      {readableLabel(lead.stage)}
                     </span>
                   </div>
-                </td>
-                <td>
-                  <span className={`status-pill status-${lead.stage}`}>
-                    {lead.stage.replaceAll("_", " ")}
-                  </span>
-                </td>
-                <td>{lead.campaignName}</td>
-                <td>
-                  <div className="table-actions">
+
+                  <div className={styles.dataCell}>
+                    <span className={styles.mobileLabel}>Campaign</span>
+                    <span>{lead.campaignName ?? "Unassigned"}</span>
+                  </div>
+
+                  <div className={styles.actions}>
                     <button
+                      type="button"
+                      className={styles.iconAction}
                       onClick={() => audit(lead.id)}
-                      disabled={running === lead.id}
+                      disabled={Boolean(running)}
                       aria-label={`Audit ${lead.name}`}
+                      aria-busy={isRunning}
                     >
-                      <ScanSearch />
+                      {isRunning ? (
+                        <LoaderCircle className={styles.spin} aria-hidden="true" />
+                      ) : (
+                        <ScanSearch aria-hidden="true" />
+                      )}
+                      <span className={styles.actionLabel}>
+                        {isRunning ? "Auditing" : "Audit"}
+                      </span>
                     </button>
+
                     {lead.websiteUrl && (
                       <a
                         href={lead.websiteUrl}
                         target="_blank"
                         rel="noreferrer"
-                        aria-label={`Open ${lead.name} website`}
+                        className={styles.iconAction}
+                        aria-label={`Open ${lead.name} website in a new tab`}
                       >
-                        <ExternalLink />
+                        <ExternalLink aria-hidden="true" />
+                        <span className={styles.actionLabel}>Website</span>
                       </a>
                     )}
+
                     <Link
                       href={`/leads/${lead.id}`}
+                      className={styles.reviewAction}
                       aria-label={`Review ${lead.name}`}
                     >
-                      <ArrowUpRight />
+                      <span>Review</span>
+                      <ArrowUpRight aria-hidden="true" />
                     </Link>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!filtered.length && (
-          <div className="empty-table">
-            <Search />
-            <b>No matching leads</b>
-            <span>Try a different search or filter.</span>
-          </div>
-        )}
-      </div>
-    </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : (
+        <div className={styles.emptyState}>
+          <span className={styles.emptyIcon}>
+            <Search aria-hidden="true" />
+          </span>
+          <h2>{leads.length ? "No matching leads" : "No leads yet"}</h2>
+          <p>
+            {leads.length
+              ? "Try another search or clear the current filters."
+              : "Discovered businesses will appear here."}
+          </p>
+          {filtersActive && (
+            <button type="button" onClick={clearFilters}>
+              <RotateCcw aria-hidden="true" />
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

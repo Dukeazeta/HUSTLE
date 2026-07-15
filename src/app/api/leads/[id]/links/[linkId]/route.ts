@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import { activities, businessLinks, businesses } from "@/db/schema";
-import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
 import { assertPublicUrl } from "@/lib/audit";
 import { id, normalizeDomain } from "@/lib/ids";
 
@@ -13,7 +13,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string; linkId: string }> },
 ) {
-  if (!(await requireOwner())) return unauthorized();
+  if (!(await requireUser())) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
 
   try {

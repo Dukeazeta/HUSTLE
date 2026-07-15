@@ -4,8 +4,6 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/db";
 import { accounts, sessions, users, verificationTokens } from "@/db/schema";
 
-const ownerEmail = process.env.OWNER_EMAIL?.trim().toLowerCase();
-
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret:
     process.env.AUTH_SECRET ??
@@ -22,14 +20,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [Google],
   pages: { signIn: "/login", error: "/login" },
   callbacks: {
-    signIn({ profile }) {
-      return Boolean(
-        ownerEmail && profile?.email?.toLowerCase() === ownerEmail,
-      );
+    signIn({ account, user }) {
+      return account?.provider === "google" && Boolean(user.email);
     },
     authorized({ auth: session }) {
-      if (process.env.DEMO_MODE === "true") return true;
-      return session?.user?.email?.toLowerCase() === ownerEmail;
+      return Boolean(session?.user?.email);
     },
   },
 });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { braveCountryCode, countryName } from "./markets";
 
 export const BUSINESS_LINK_TYPES = [
   "website",
@@ -259,7 +260,7 @@ export function buildBraveSearchRequest(input: {
   city: string;
   country: string;
 }) {
-  const market = input.country === "NG" ? "Nigeria" : "United Kingdom";
+  const market = countryName(input.country);
   const rawQuery = `"${input.businessName.trim()}" "${input.city.trim()}" ${market} official website Instagram LinkedIn`;
   const query = rawQuery.split(/\s+/).slice(0, 50).join(" ").slice(0, 400);
   const endpoint = new URL("https://api.search.brave.com/res/v1/web/search");
@@ -267,7 +268,8 @@ export function buildBraveSearchRequest(input: {
   endpoint.searchParams.set("count", "10");
   endpoint.searchParams.set("search_lang", "en");
   endpoint.searchParams.set("safesearch", "moderate");
-  if (input.country === "UK") endpoint.searchParams.set("country", "gb");
+  const country = braveCountryCode(input.country);
+  if (country) endpoint.searchParams.set("country", country);
   return { endpoint, query };
 }
 

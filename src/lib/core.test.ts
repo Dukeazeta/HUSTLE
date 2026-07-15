@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { createClient } from "@libsql/client";
+import { readFileSync } from "node:fs";
 import {
   auditWebsite,
   calculateOpportunityScore,
@@ -7,7 +9,7 @@ import {
 } from "./audit";
 import { addBusinessDays, buildPitch } from "./drafts";
 import { normalizeDomain, normalizePhone } from "./ids";
-import { preferredPlacePhone } from "./places";
+import { buildPlacesSearchRequest, preferredPlacePhone } from "./places";
 import {
   braveSearchErrorMessage,
   buildBraveSearchRequest,
@@ -16,7 +18,15 @@ import {
 } from "./web-enrichment";
 import { withDatabaseRetry } from "./db-retry";
 import { buildPitchPrompt } from "./gemini";
-import { ukOutreachBlockReason } from "./outreach-compliance";
+import { outreachBlockReason } from "./outreach-compliance";
+import {
+  braveCountryCode,
+  countryName,
+  isCountryCode,
+  isCurrencyCode,
+  normalizeCountryCode,
+  packagePricesFromCampaign,
+} from "./markets";
 import { aggregatePitchStyleSignals } from "./pitch-learning";
 import {
   buildFallbackPitchParts,
@@ -144,7 +154,7 @@ describe("public business presence", () => {
     const uk = buildBraveSearchRequest({
       businessName: "Test Salon",
       city: "London",
-      country: "UK",
+      country: "GB",
     });
     expect(nigeria.endpoint.searchParams.has("country")).toBe(false);
     expect(nigeria.query).toContain("Nigeria");
@@ -201,7 +211,7 @@ describe("outreach safety", () => {
   it("builds an evidence-based message with opt-out wording", () => {
     const draft = buildPitch({
       businessName: "Test Spa",
-      country: "UK",
+      country: "GB",
       channel: "email",
       findings: [finding],
       sourceUrl: "https://maps.example/test",
@@ -377,24 +387,171 @@ describe("pitch generation upgrade", () => {
     expect(JSON.stringify(signals)).not.toContain("Ada");
   });
 
-  it("blocks UK outreach until a valid basis is recorded", () => {
+  it("requires campaign and lead review outside Nigeria", () => {
+    const reviewedCampaign = {
+      campaignComplianceReviewedAt: "2026-07-14T11:00:00Z",
+      campaignComplianceNote: "Reviewed Canadian commercial messaging rules.",
+      approvedChannels: ["email"],
+    };
     expect(
-      ukOutreachBlockReason({
-        country: "UK",
+      outreachBlockReason({
+        country: "CA",
         legalForm: "unknown",
+        complianceReviewed: false,
         outreachBasis: null,
         outreachBasisNote: null,
         outreachBasisReviewedAt: null,
+        campaignComplianceReviewedAt: null,
+        campaignComplianceNote: null,
+        approvedChannels: [],
+        channel: "email",
       }),
-    ).toContain("basis");
+    ).toContain("campaign compliance");
     expect(
-      ukOutreachBlockReason({
-        country: "UK",
+      outreachBlockReason({
+        country: "CA",
+        legalForm: "corporate",
+        complianceReviewed: true,
+        outreachBasis: "corporate_b2b",
+        outreachBasisNote: null,
+        outreachBasisReviewedAt: "2026-07-14T12:00:00Z",
+        ...reviewedCampaign,
+        channel: "linkedin",
+      }),
+    ).toContain("Approve linkedin");
+    expect(
+      outreachBlockReason({
+        country: "CA",
+        legalForm: "unknown",
+        complianceReviewed: true,
+        outreachBasis: "corporate_b2b",
+        outreachBasisNote: null,
+        outreachBasisReviewedAt: "2026-07-14T12:00:00Z",
+        ...reviewedCampaign,
+        channel: "email",
+      }),
+    ).toContain("confirmed corporate");
+    expect(
+      outreachBlockReason({
+        country: "CA",
         legalForm: "sole_trader",
+        complianceReviewed: true,
         outreachBasis: "consent",
         outreachBasisNote: "Consent recorded in the enquiry email",
         outreachBasisReviewedAt: "2026-07-14T12:00:00Z",
+        ...reviewedCampaign,
+        channel: "email",
       }),
     ).toBeNull();
+    expect(
+      outreachBlockReason({
+        country: "NG",
+        legalForm: "unknown",
+        complianceReviewed: false,
+        outreachBasis: null,
+        outreachBasisNote: null,
+        outreachBasisReviewedAt: null,
+        campaignComplianceReviewedAt: null,
+        campaignComplianceNote: null,
+        approvedChannels: [],
+        channel: "whatsapp",
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("worldwide market catalog", () => {
+  it.each(["CA", "US", "AU", "DE", "AE", "BR", "IN", "JP"])(
+    "accepts the %s market",
+    (country) => expect(isCountryCode(country)).toBe(true),
+  );
+
+  it("normalizes the legacy UK code and validates currencies", () => {
+    expect(normalizeCountryCode("UK")).toBe("GB");
+    expect(countryName("GB")).toBe("United Kingdom");
+    expect(isCurrencyCode("CAD")).toBe(true);
+    expect(isCurrencyCode("ZZZ")).toBe(false);
+    expect(isCountryCode("ZZ")).toBe(false);
+  });
+
+  it("only applies Brave country bias for supported markets", () => {
+    expect(braveCountryCode("GB")).toBe("gb");
+    expect(braveCountryCode("NG")).toBeNull();
+  });
+
+  it("builds an English Google Places query for the selected market", () => {
+    expect(
+      buildPlacesSearchRequest({
+        city: "Toronto",
+        country: "CA",
+        category: "event_venue",
+        limit: 60,
+      }),
+    ).toEqual({
+      textQuery: "event venue in Toronto, Canada",
+      pageSize: 20,
+      languageCode: "en",
+      regionCode: "CA",
+    });
+  });
+
+  it("keeps campaign package prices independent of country", () => {
+    expect(
+      packagePricesFromCampaign({
+        landingPagePrice: 650,
+        completeWebsitePrice: 1750,
+        bookingCataloguePrice: 3000,
+      }),
+    ).toEqual({
+      landingPageRescue: 650,
+      completeBusinessWebsite: 1750,
+      bookingCatalogueWebsite: 3000,
+    });
+  });
+});
+
+describe("worldwide market migration", () => {
+  it("backfills legacy UK campaigns and businesses without changing prices", async () => {
+    const client = createClient({ url: "file::memory:" });
+    try {
+      await client.execute(
+        "CREATE TABLE campaigns (id text PRIMARY KEY NOT NULL, country text NOT NULL)",
+      );
+      await client.execute(
+        "CREATE TABLE businesses (id text PRIMARY KEY NOT NULL, country text NOT NULL)",
+      );
+      await client.execute(
+        "INSERT INTO campaigns (id, country) VALUES ('cmp_uk', 'UK')",
+      );
+      await client.execute(
+        "INSERT INTO businesses (id, country) VALUES ('biz_uk', 'UK')",
+      );
+
+      const migration = readFileSync(
+        new URL("../../drizzle/0007_worldwide_markets.sql", import.meta.url),
+        "utf8",
+      );
+      for (const statement of migration.split("--> statement-breakpoint")) {
+        if (statement.trim()) await client.execute(statement);
+      }
+
+      const campaign = await client.execute(
+        "SELECT country, currency, landing_page_price, complete_website_price, booking_catalogue_price FROM campaigns WHERE id = 'cmp_uk'",
+      );
+      const business = await client.execute(
+        "SELECT country FROM businesses WHERE id = 'biz_uk'",
+      );
+
+      expect(campaign.rows[0]).toMatchObject({
+        country: "GB",
+        currency: "GBP",
+        landing_page_price: 450,
+        complete_website_price: 1200,
+        booking_catalogue_price: 2200,
+      });
+      expect(business.rows[0]).toMatchObject({ country: "GB" });
+    } finally {
+      client.close();
+    }
   });
 });

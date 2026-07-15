@@ -34,16 +34,3 @@ export type OutreachChannel = (typeof OUTREACH_CHANNELS)[number];
 
 export const PITCH_VARIANT_LABELS = ["short", "warm", "specific"] as const;
 export type PitchVariantLabel = (typeof PITCH_VARIANT_LABELS)[number];
-
-export const PACKAGES = {
-  NG: [
-    { name: "Landing page rescue", price: 85000, currency: "NGN" },
-    { name: "Complete business website", price: 220000, currency: "NGN" },
-    { name: "Booking or catalogue website", price: 380000, currency: "NGN" },
-  ],
-  UK: [
-    { name: "Landing page rescue", price: 450, currency: "GBP" },
-    { name: "Complete business website", price: 1200, currency: "GBP" },
-    { name: "Booking or catalogue website", price: 2200, currency: "GBP" },
-  ],
-} as const;

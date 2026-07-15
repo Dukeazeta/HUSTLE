@@ -1,11 +1,14 @@
 import { desc, eq } from "drizzle-orm";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { db, isDatabaseConfigured } from "@/db";
 import {
   activities,
   audits,
   businessLinks,
   businesses,
+  campaigns,
   contacts,
   findings,
   opportunities,
@@ -14,9 +17,11 @@ import {
   pitchVariants,
   proposals,
 } from "@/db/schema";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppShell } from "@/components/layout/app-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { LeadWorkspace } from "@/components/lead-workspace";
-import { demoLeads } from "@/lib/demo-data";
+import { demoCampaigns, demoLeads } from "@/lib/demo-data";
+import styles from "./page.module.css";
 export const dynamic = "force-dynamic";
 export default async function LeadPage({
   params,
@@ -29,6 +34,14 @@ export default async function LeadPage({
     ? await db.query.businesses.findFirst({ where: eq(businesses.id, leadId) })
     : demoLeads.find((item) => item.id === leadId);
   if (!lead) notFound();
+  const liveLead = configured ? (lead as typeof businesses.$inferSelect) : null;
+  const demoLead = configured ? null : (lead as (typeof demoLeads)[number]);
+  const campaign = configured
+    ? await db.query.campaigns.findFirst({
+        where: eq(campaigns.id, liveLead!.campaignId),
+      })
+    : demoCampaigns.find((item) => item.name === demoLead!.campaignName);
+  if (!campaign) notFound();
   const audit = configured
     ? await db.query.audits.findFirst({
         where: eq(audits.businessId, leadId),
@@ -104,7 +117,6 @@ export default async function LeadPage({
         .where(eq(activities.businessId, leadId))
         .orderBy(desc(activities.createdAt))
     : [];
-  const liveLead = configured ? (lead as typeof businesses.$inferSelect) : null;
   const workspaceLead = {
     id: lead.id,
     name: lead.name,
@@ -123,8 +135,17 @@ export default async function LeadPage({
     suppressed: lead.suppressed,
   };
   return (
-    <div className="app-frame lead-frame">
-      <AppSidebar
+    <AppShell active="leads">
+      <PageHeader
+        eyebrow="Lead workspace"
+        title={lead.name}
+        description="Review the evidence, make the next decision and keep every action manual."
+        actions={
+          <Link href="/leads" className={styles.backLink}>
+            <ArrowLeft aria-hidden="true" />
+            All leads
+          </Link>
+        }
         lead={{
           name: lead.name,
           category: lead.category,
@@ -136,6 +157,7 @@ export default async function LeadPage({
       />
       <LeadWorkspace
         lead={workspaceLead as Parameters<typeof LeadWorkspace>[0]["lead"]}
+        campaign={campaign}
         demo={!configured}
         canDraft={Boolean(audit && !lead.suppressed)}
         drafts={drafts as Parameters<typeof LeadWorkspace>[0]["drafts"]}
@@ -151,6 +173,6 @@ export default async function LeadPage({
         evidence={evidence}
         auditSummary={audit?.summary ?? null}
       />
-    </div>
+    </AppShell>
   );
 }

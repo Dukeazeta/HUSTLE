@@ -3,20 +3,25 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import { activities, businesses, opportunities } from "@/db/schema";
-import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
 import { id } from "@/lib/ids";
+import { isCurrencyCode, normalizeCurrencyCode } from "@/lib/markets";
 
 const schema = z.object({
   packageName: z.string().min(3).max(120).optional(),
   valueMinor: z.number().int().positive().optional(),
-  currency: z.enum(["NGN", "GBP"]).optional(),
+  currency: z
+    .string()
+    .transform(normalizeCurrencyCode)
+    .refine(isCurrencyCode, { message: "Select a valid currency" })
+    .optional(),
   previewUrl: z.string().url().optional(),
 });
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireOwner())) return unauthorized();
+  if (!(await requireUser())) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const opportunityId = (await params).id;

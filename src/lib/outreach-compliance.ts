@@ -1,18 +1,31 @@
-export type UkOutreachBasis =
+import type { OutreachChannel } from "./constants";
+
+export type OutreachBasis =
   | "corporate_b2b"
   | "consent"
   | "solicited_request";
 
-export function ukOutreachBlockReason(input: {
+export function outreachBlockReason(input: {
   country: string;
   legalForm: string;
+  complianceReviewed: boolean;
   outreachBasis: string | null;
   outreachBasisNote: string | null;
   outreachBasisReviewedAt: string | null;
+  campaignComplianceReviewedAt: string | null;
+  campaignComplianceNote: string | null;
+  approvedChannels: string[];
+  channel: OutreachChannel;
 }) {
-  if (input.country !== "UK") return null;
+  if (input.country === "NG") return null;
+  if (!input.campaignComplianceReviewedAt || !input.campaignComplianceNote?.trim())
+    return "Complete the campaign compliance review before drafting";
+  if (!input.approvedChannels.includes(input.channel))
+    return `Approve ${input.channel} outreach in the campaign compliance review`;
+  if (!input.complianceReviewed)
+    return "Complete this lead's manual compliance review before drafting";
   if (!input.outreachBasis || !input.outreachBasisReviewedAt)
-    return "Record the UK outreach basis before drafting";
+    return "Record the outreach basis before drafting";
   if (input.outreachBasis === "corporate_b2b") {
     return input.legalForm === "corporate"
       ? null
@@ -26,5 +39,5 @@ export function ukOutreachBlockReason(input: {
       ? null
       : "Document the consent or solicited request before drafting";
   }
-  return "The recorded UK outreach basis is not valid";
+  return "The recorded outreach basis is not valid";
 }

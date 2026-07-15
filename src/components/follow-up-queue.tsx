@@ -1,62 +1,117 @@
 import Link from "next/link";
 import {
+  ArrowUpRight,
   BriefcaseBusiness,
   CalendarClock,
   Camera,
-  MessageCircle,
   Mail,
+  MessageCircle,
+  type LucideIcon,
 } from "lucide-react";
 import type { OutreachChannel } from "@/lib/constants";
+import styles from "./follow-up-queue.module.css";
+
+type FollowUpReminder = {
+  draftId: string;
+  businessId: string;
+  businessName: string;
+  channel: OutreachChannel;
+  dueAt: string | null;
+  body: string;
+};
+
+type FollowUpQueueProps = {
+  reminders: FollowUpReminder[];
+  compact?: boolean;
+  emptyTitle?: string;
+  emptyBody?: string;
+};
+
+const channelDetails: Record<
+  OutreachChannel,
+  { label: string; icon: LucideIcon }
+> = {
+  email: { label: "Email", icon: Mail },
+  whatsapp: { label: "WhatsApp", icon: MessageCircle },
+  instagram: { label: "Instagram", icon: Camera },
+  linkedin: { label: "LinkedIn", icon: BriefcaseBusiness },
+};
+
+const dateFormatter = new Intl.DateTimeFormat("en", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+function formatDueDate(dueAt: string | null) {
+  if (!dueAt) return "Now";
+
+  const dueDate = new Date(dueAt);
+  return Number.isNaN(dueDate.getTime())
+    ? "Date unavailable"
+    : dateFormatter.format(dueDate);
+}
+
 export function FollowUpQueue({
   reminders,
-}: {
-  reminders: {
-    draftId: string;
-    businessId: string;
-    businessName: string;
-    channel: OutreachChannel;
-    dueAt: string | null;
-    body: string;
-  }[];
-}) {
+  compact = false,
+  emptyTitle = "No follow-ups due",
+  emptyBody = "Sent outreach will appear here after five business days.",
+}: FollowUpQueueProps) {
+  const queueClassName = compact
+    ? `${styles.queue} ${styles.compact}`
+    : styles.queue;
+
   return (
-    <div className="followup-queue">
+    <section className={queueClassName} aria-label="Follow-up reminders">
       {reminders.length ? (
-        reminders.map((item) => (
-          <article key={item.draftId}>
-            <span className="followup-channel">
-              {item.channel === "email" ? (
-                <Mail size={15} />
-              ) : item.channel === "instagram" ? (
-                <Camera size={15} />
-              ) : item.channel === "linkedin" ? (
-                <BriefcaseBusiness size={15} />
-              ) : (
-                <MessageCircle size={15} />
-              )}{" "}
-              {item.channel}
-            </span>
-            <div>
-              <strong>{item.businessName}</strong>
-              <p>
-                {item.body.slice(0, 150)}
-                {item.body.length > 150 ? "…" : ""}
-              </p>
-              <small>
-                Due{" "}
-                {item.dueAt ? new Date(item.dueAt).toLocaleDateString() : "now"}
-              </small>
-            </div>
-            <Link href={`/leads/${item.businessId}`}>Review and follow up</Link>
-          </article>
-        ))
+        reminders.map((item) => {
+          const channel = channelDetails[item.channel];
+          const ChannelIcon = channel.icon;
+
+          return (
+            <article className={styles.row} key={item.draftId}>
+              <span className={styles.iconPlate} aria-hidden="true">
+                <ChannelIcon />
+              </span>
+
+              <div className={styles.identity}>
+                <div className={styles.titleLine}>
+                  <strong>{item.businessName}</strong>
+                  <span>{channel.label}</span>
+                </div>
+                <p>{item.body}</p>
+              </div>
+
+              <div className={styles.due}>
+                <span>Due</span>
+                <time dateTime={item.dueAt ?? undefined}>
+                  {formatDueDate(item.dueAt)}
+                </time>
+              </div>
+
+              <Link
+                className={styles.action}
+                href={`/leads/${item.businessId}`}
+                aria-label={`Review follow-up for ${item.businessName}`}
+              >
+                Review
+                <ArrowUpRight aria-hidden="true" />
+              </Link>
+            </article>
+          );
+        })
       ) : (
-        <div className="empty-state">
-          <CalendarClock size={28} />
-          <h3>No follow-ups due</h3>
-          <p>Sent outreach will appear here after five business days.</p>
+        <div className={styles.empty} role="status">
+          <span className={styles.iconPlate} aria-hidden="true">
+            <CalendarClock />
+          </span>
+          <div>
+            <h3>{emptyTitle}</h3>
+            <p>{emptyBody}</p>
+          </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

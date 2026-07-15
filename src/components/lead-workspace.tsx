@@ -2,18 +2,18 @@
 
 import { useEffect, useState } from "react";
 import {
-  ArrowUpRight,
+  AlertCircle,
   AtSign,
   BriefcaseBusiness,
   Camera,
   Check,
   CheckCircle2,
-  ChevronDown,
   CircleDollarSign,
   Copy,
   ExternalLink,
   FileText,
   Globe2,
+  Info,
   LoaderCircle,
   Mail,
   MessageCircle,
@@ -23,7 +23,6 @@ import {
   ScanSearch,
   Search,
   ShieldCheck,
-  ShieldX,
   Sparkles,
   ThumbsDown,
   ThumbsUp,
@@ -32,122 +31,38 @@ import {
 } from "lucide-react";
 import {
   OUTREACH_CHANNELS,
-  PACKAGES,
   PIPELINE_STAGES,
   type OutreachChannel,
 } from "@/lib/constants";
-
-type Draft = {
-  id: string;
-  channel: OutreachChannel;
-  sourceVariantId: string | null;
-  subject: string | null;
-  body: string;
-  feedback: "up" | "down" | null;
-  status: string;
-  sentAt: string | null;
-  followUpDueAt: string | null;
-  followUpSubject: string | null;
-  followUpBody: string | null;
-  followUpSentAt: string | null;
-};
-
-type PitchGeneration = {
-  id: string;
-  channel: OutreachChannel;
-  usedFallback: boolean;
-} | null;
-
-type PitchVariant = {
-  id: string;
-  generationId: string;
-  label: "short" | "warm" | "specific";
-  subject: string | null;
-  body: string;
-  evidenceCodes: string[];
-};
-
-type Contact = {
-  id: string;
-  channel: "email" | "phone" | "whatsapp";
-  value: string;
-  sourceUrl: string;
-  verified: boolean;
-  isPrimary: boolean;
-  verificationMethod: "unverified" | "manual" | "published_whatsapp";
-};
-
-type BusinessLink = {
-  id: string;
-  type: "website" | "instagram" | "linkedin" | "facebook" | "x" | "tiktok";
-  url: string;
-  sourceUrl: string;
-  verificationStatus: "candidate" | "confirmed" | "rejected";
-  confidence: number;
-  evidence: string;
-};
-
-type Opportunity = {
-  id: string;
-  stage: string;
-  packageName: string | null;
-  currency: string | null;
-  valueMinor: number | null;
-  nextActionAt: string | null;
-  previewUrl: string | null;
-  previewApprovedAt: string | null;
-  paidAt: string | null;
-} | null;
-
-type Proposal = {
-  id: string;
-  title: string;
-  content: string;
-  expiresAt: string;
-} | null;
-
-type Activity = {
-  id: string;
-  type: string;
-  detail: string | null;
-  createdAt: string;
-};
-
-type Evidence = {
-  id: string;
-  code: string;
-  severity: string;
-  title: string;
-  evidence: string;
-  recommendation: string;
-};
-
-type Lead = {
-  id: string;
-  name: string;
-  country: string;
-  stage: string;
-  sourceUrl: string;
-  websiteUrl: string | null;
-  legalForm: "corporate" | "sole_trader" | "unknown";
-  complianceReviewed: boolean;
-  outreachBasis: "corporate_b2b" | "consent" | "solicited_request" | null;
-  outreachBasisNote: string | null;
-  outreachBasisReviewedAt: string | null;
-  suppressed: boolean;
-  score: number;
-  category: string;
-  city: string;
-};
-
-const workflow = [
-  { id: "audit", label: "Audit", icon: ScanSearch },
-  { id: "contact", label: "Contact", icon: ShieldCheck },
-  { id: "pitch", label: "Pitch", icon: MessageCircle },
-  { id: "proposal", label: "Proposal", icon: FileText },
-  { id: "preview", label: "Preview", icon: Globe2 },
-  { id: "payment", label: "Payment", icon: CircleDollarSign },
-] as const;
+import {
+  PACKAGE_KEYS,
+  PACKAGE_NAMES,
+  countryName,
+  packageKeyFromName,
+  packagePricesFromCampaign,
+} from "@/lib/markets";
+import { outreachBlockReason } from "@/lib/outreach-compliance";
+import styles from "./lead-workspace.module.css";
+import type {
+  Activity,
+  BusinessLink,
+  CampaignContext,
+  Contact,
+  Draft,
+  Evidence,
+  Lead,
+  Opportunity,
+  PitchGeneration,
+  PitchVariant,
+  Proposal,
+} from "./lead-workspace/types";
+import {
+  WORKFLOW,
+  initialWorkflow,
+  stageDescription,
+  type WorkflowStage,
+} from "./lead-workspace/workflow";
+import { DealRail } from "./lead-workspace/deal-rail";
 
 const businessLinkIcons = {
   website: Globe2,
@@ -158,20 +73,9 @@ const businessLinkIcons = {
   tiktok: Music2,
 };
 
-type WorkflowStage = (typeof workflow)[number]["id"];
-
-function initialWorkflow(stage: string): WorkflowStage {
-  if (["discovered", "audited", "qualified"].includes(stage)) return "audit";
-  if (stage === "pitch_ready") return "pitch";
-  if (["contacted", "replied", "meeting"].includes(stage)) return "pitch";
-  if (stage === "proposal") return "proposal";
-  if (stage === "preview") return "preview";
-  if (["payment_due", "won"].includes(stage)) return "payment";
-  return "contact";
-}
-
 export function LeadWorkspace({
   lead: initialLead,
+  campaign,
   demo,
   canDraft,
   drafts: initialDrafts,
@@ -186,6 +90,7 @@ export function LeadWorkspace({
   auditSummary,
 }: {
   lead: Lead;
+  campaign: CampaignContext;
   demo: boolean;
   canDraft: boolean;
   drafts: Draft[];
@@ -210,6 +115,9 @@ export function LeadWorkspace({
     initialWorkflow(initialLead.stage),
   );
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<
+    "success" | "error" | "info"
+  >("success");
   const [messageClosing, setMessageClosing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [checkedWhatsAppContact, setCheckedWhatsAppContact] = useState("");
@@ -242,9 +150,17 @@ export function LeadWorkspace({
     window.setTimeout(() => setMessage(""), 180);
   }
 
+  function notify(
+    text: string,
+    tone: "success" | "error" | "info" = "success",
+  ) {
+    setMessageTone(tone);
+    setMessage(text);
+  }
+
   async function request(path: string, method = "POST", body: object = {}) {
     if (demo) {
-      setMessage("Demo data is read-only.");
+      notify("Demo data is read-only.", "info");
       return null;
     }
     setBusy(true);
@@ -257,9 +173,13 @@ export function LeadWorkspace({
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Request failed");
+      setMessageTone("success");
       return data;
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Request failed");
+      notify(
+        error instanceof Error ? error.message : "Request failed",
+        "error",
+      );
       return null;
     } finally {
       setBusy(false);
@@ -267,7 +187,7 @@ export function LeadWorkspace({
   }
 
   function refresh(text: string) {
-    setMessage(text);
+    notify(text);
     setTimeout(() => location.reload(), 500);
   }
 
@@ -284,7 +204,7 @@ export function LeadWorkspace({
     if (data) {
       setGeneration(data.generation);
       setVariants(data.variants);
-      setMessage("Three pitch options are ready. Choose one to edit.");
+      notify("Three pitch options are ready. Choose one to edit.");
     }
   }
 
@@ -302,7 +222,7 @@ export function LeadWorkspace({
       },
       ...rows.filter((row) => row.id !== data.draft.id),
     ]);
-    setMessage(`${variant.label} variant selected. Edit it before sending.`);
+    notify(`${variant.label} variant selected. Edit it before sending.`);
   }
 
   async function saveDraft(item: Draft) {
@@ -312,7 +232,7 @@ export function LeadWorkspace({
         body: item.body,
       })
     ) {
-      setMessage("Draft saved.");
+      notify("Draft saved.");
     }
   }
 
@@ -327,7 +247,7 @@ export function LeadWorkspace({
         row.id === item.id ? { ...row, feedback: nextFeedback } : row,
       ),
     );
-    setMessage("Style feedback saved.");
+    notify("Style feedback saved.");
   }
 
   function target(channel: OutreachChannel) {
@@ -344,21 +264,25 @@ export function LeadWorkspace({
   async function openComposer(item: Draft, followUp = false) {
     const destination = target(item.channel);
     if (!destination)
-      return setMessage(`Verify or confirm a ${item.channel} target first.`);
+      return notify(
+        `Verify or confirm a ${item.channel} target first.`,
+        "error",
+      );
     const subject = followUp ? item.followUpSubject : item.subject;
     const body = followUp ? item.followUpBody : item.body;
     if (item.channel === "instagram" || item.channel === "linkedin") {
       if (!("url" in destination))
-        return setMessage(`Confirm a ${item.channel} profile first.`);
+        return notify(`Confirm a ${item.channel} profile first.`, "error");
       await navigator.clipboard.writeText(body ?? "");
       window.open(destination.url, "_blank", "noopener,noreferrer");
-      setMessage(
+      notify(
         `Message copied and ${item.channel} opened. Send it manually, then confirm here.`,
+        "info",
       );
       return;
     }
     if (!("value" in destination))
-      return setMessage(`Verify a ${item.channel} contact first.`);
+      return notify(`Verify a ${item.channel} contact first.`, "error");
     const url =
       item.channel === "email"
         ? `mailto:${encodeURIComponent(destination.value)}?subject=${encodeURIComponent(subject ?? "")}&body=${encodeURIComponent(body ?? "")}`
@@ -381,7 +305,7 @@ export function LeadWorkspace({
             : row,
         ),
       );
-      setMessage("Outreach recorded and follow-up scheduled.");
+      notify("Outreach recorded and follow-up scheduled.");
     }
   }
 
@@ -405,7 +329,7 @@ export function LeadWorkspace({
         body: item.followUpBody,
       })
     ) {
-      setMessage("Follow-up saved.");
+      notify("Follow-up saved.");
     }
   }
 
@@ -419,7 +343,7 @@ export function LeadWorkspace({
             : row,
         ),
       );
-      setMessage("Follow-up recorded.");
+      notify("Follow-up recorded.");
     }
   }
 
@@ -451,7 +375,7 @@ export function LeadWorkspace({
             : row,
         ),
       );
-      setMessage("Contact verified.");
+      notify("Contact verified.");
     }
   }
 
@@ -459,8 +383,9 @@ export function LeadWorkspace({
     const phone = contact.value.replace(/\D/g, "");
     window.open(`https://wa.me/${phone}`, "_blank", "noopener,noreferrer");
     setCheckedWhatsAppContact(contact.id);
-    setMessage(
+    notify(
       "WhatsApp opened without a message. Confirm only if the business profile is available.",
+      "info",
     );
   }
 
@@ -483,7 +408,7 @@ export function LeadWorkspace({
     const data = await request(`/api/leads/${lead.id}/enrich`);
     if (!data) return;
     setLinks(data.links);
-    setMessage(
+    notify(
       data.cached
         ? "Showing today’s saved public-web results."
         : `${data.links.length} public website and profile candidates found.`,
@@ -513,7 +438,7 @@ export function LeadWorkspace({
         )
         .filter((row) => row.verificationStatus !== "rejected"),
     );
-    setMessage(
+    notify(
       action === "confirm"
         ? `${link.type} profile confirmed.`
         : "Candidate dismissed.",
@@ -531,7 +456,17 @@ export function LeadWorkspace({
     }
   }
 
-  const defaultPackage = PACKAGES[lead.country as "NG" | "UK"][1];
+  const campaignPriceMap = packagePricesFromCampaign(campaign);
+  const campaignPackages = PACKAGE_KEYS.map((key) => ({
+    key,
+    name: PACKAGE_NAMES[key],
+    price: campaignPriceMap[key],
+  }));
+  const defaultPackage =
+    campaignPackages.find(
+      (item) => item.key === packageKeyFromName(initialOpportunity?.packageName),
+    ) ?? campaignPackages[1];
+  const proposalCurrency = initialOpportunity?.currency ?? campaign.currency;
   const [proposalForm, setProposalForm] = useState({
     title: initialProposal?.title ?? `${lead.name} website proposal`,
     content:
@@ -549,7 +484,7 @@ export function LeadWorkspace({
     await request(`/api/opportunities/${opportunity.id}`, "PATCH", {
       packageName: proposalForm.packageName,
       valueMinor: Number(proposalForm.valueMinor),
-      currency: defaultPackage.currency,
+      currency: proposalCurrency,
     });
     const data = await request(
       `/api/opportunities/${opportunity.id}/proposal`,
@@ -562,7 +497,7 @@ export function LeadWorkspace({
         ).toISOString(),
       },
     );
-    if (data) setMessage("Proposal saved for manual delivery.");
+    if (data) notify("Proposal saved for manual delivery.");
   }
 
   async function recordPreview() {
@@ -576,7 +511,7 @@ export function LeadWorkspace({
     );
     if (data) {
       setOpportunity(data.opportunity);
-      setMessage("Restricted preview recorded.");
+      notify("Restricted preview recorded.");
     }
   }
 
@@ -594,7 +529,7 @@ export function LeadWorkspace({
       opportunity &&
       (await request(`/api/opportunities/${opportunity.id}/payment`, "POST", {
         amountMinor: Number(proposalForm.valueMinor),
-        currency: defaultPackage.currency,
+        currency: proposalCurrency,
         reference: proposalForm.paymentReference || undefined,
       }))
     ) {
@@ -603,24 +538,21 @@ export function LeadWorkspace({
   }
 
   const selectedDraft = drafts[0];
-  const ukBasisReady =
-    lead.country !== "UK" ||
-    Boolean(
-      lead.outreachBasisReviewedAt &&
-        ((lead.outreachBasis === "corporate_b2b" &&
-          lead.legalForm === "corporate") ||
-          ((lead.outreachBasis === "consent" ||
-            lead.outreachBasis === "solicited_request") &&
-            lead.outreachBasisNote?.trim())),
-    );
   const channelOptions = OUTREACH_CHANNELS.map((channel) => {
     const destination = target(channel);
+    const complianceReason = outreachBlockReason({
+      ...lead,
+      channel,
+      campaignComplianceReviewedAt: campaign.complianceReviewedAt,
+      campaignComplianceNote: campaign.complianceNote,
+      approvedChannels: campaign.approvedChannels,
+    });
     const reason = !canDraft
       ? "Run an audit first"
       : lead.suppressed
         ? "Lead is suppressed"
-        : !ukBasisReady
-          ? "Record a valid UK outreach basis"
+        : complianceReason
+          ? complianceReason
           : !destination
             ? channel === "instagram" || channel === "linkedin"
               ? `Confirm the business-owned ${channel} profile`
@@ -629,22 +561,44 @@ export function LeadWorkspace({
     return { channel, available: !reason, reason };
   });
 
+  const completedStages: Record<WorkflowStage, boolean> = {
+    audit: Boolean(auditSummary || evidence.length),
+    contact:
+      contacts.some((item) => item.verified) ||
+      links.some((item) => item.verificationStatus === "confirmed"),
+    pitch: drafts.length > 0,
+    proposal: Boolean(initialProposal),
+    preview: Boolean(opportunity?.previewUrl),
+    payment: Boolean(opportunity?.paidAt),
+  };
+
   return (
-    <div id="workflow" className="workflow-shell">
-      <div className="workflow-stepper">
-        {workflow.map((item, index) => {
+    <div className={styles.root}>
+      <div id="workflow" className="workflow-shell">
+      <div className="workflow-lead-bar" aria-label="Current lead">
+        <div>
+          <strong>{lead.name}</strong>
+          <span>
+            {lead.city}, {countryName(lead.country)}
+          </span>
+        </div>
+        <span>{lead.score}/100</span>
+        <span>{lead.stage.replaceAll("_", " ")}</span>
+      </div>
+      <div className="workflow-stepper" aria-label="Lead workflow steps">
+        {WORKFLOW.map((item) => {
           const Icon = item.icon;
           const selected = active === item.id;
-          const done = workflow.findIndex((row) => row.id === active) > index;
+          const done = completedStages[item.id];
           return (
             <button
               key={item.id}
               className={`${selected ? "active" : ""} ${done ? "done" : ""}`}
               onClick={() => setActive(item.id)}
+              aria-current={selected ? "step" : undefined}
             >
               <span>{done ? <Check /> : <Icon />}</span>
               {item.label}
-              <i />
             </button>
           );
         })}
@@ -652,11 +606,19 @@ export function LeadWorkspace({
 
       {message && (
         <div
-          className={`workflow-toast ${messageClosing ? "closing" : ""}`}
-          role="status"
-          aria-live="polite"
+          className={`workflow-toast ${messageTone} ${messageClosing ? "closing" : ""}`}
+          role={messageTone === "error" ? "alert" : "status"}
+          aria-live={messageTone === "error" ? "assertive" : "polite"}
         >
-          {busy ? <LoaderCircle className="spin" /> : <CheckCircle2 />}
+          {busy ? (
+            <LoaderCircle className="spin" />
+          ) : messageTone === "error" ? (
+            <AlertCircle />
+          ) : messageTone === "info" ? (
+            <Info />
+          ) : (
+            <CheckCircle2 />
+          )}
           <span>{message}</span>
           <button
             type="button"
@@ -674,18 +636,25 @@ export function LeadWorkspace({
           <div className="stage-heading">
             <div>
               <span className="section-kicker">Lead workflow</span>
-              <h1>{workflow.find((item) => item.id === active)?.label}</h1>
+              <h1>{WORKFLOW.find((item) => item.id === active)?.label}</h1>
               <p>{stageDescription(active)}</p>
             </div>
-            <select
-              aria-label="Pipeline stage"
-              value={lead.stage}
-              onChange={(e) => setLead({ ...lead, stage: e.target.value })}
-            >
-              {PIPELINE_STAGES.map((stage) => (
-                <option key={stage}>{stage}</option>
-              ))}
-            </select>
+            <div className="stage-control">
+              <label>
+                <span>Pipeline stage</span>
+                <select
+                  value={lead.stage}
+                  onChange={(e) => setLead({ ...lead, stage: e.target.value })}
+                >
+                  {PIPELINE_STAGES.map((stage) => (
+                    <option key={stage}>{stage}</option>
+                  ))}
+                </select>
+              </label>
+              <button onClick={() => updateLead({ stage: lead.stage })}>
+                Save stage
+              </button>
+            </div>
           </div>
 
           {active === "audit" && (
@@ -704,21 +673,31 @@ export function LeadWorkspace({
                   </button>
                 </div>
                 <div className="evidence-list">
-                  {evidence.map((item) => (
-                    <article key={item.id}>
-                      <span className={`severity ${item.severity}`}>
-                        {item.severity}
-                      </span>
+                  {evidence.length ? (
+                    evidence.map((item) => (
+                      <article key={item.id}>
+                        <span className={`severity ${item.severity}`}>
+                          {item.severity}
+                        </span>
+                        <div>
+                          <b>{item.title}</b>
+                          <p>{item.evidence}</p>
+                          <small>{item.recommendation}</small>
+                        </div>
+                      </article>
+                    ))
+                  ) : (
+                    <div className="panel-empty">
+                      <ScanSearch />
                       <div>
-                        <b>{item.title}</b>
-                        <p>{item.evidence}</p>
-                        <small>{item.recommendation}</small>
+                        <b>No audit findings yet</b>
+                        <p>Run the audit to collect public website evidence.</p>
                       </div>
-                    </article>
-                  ))}
+                    </div>
+                  )}
                 </div>
               </section>
-              <AiLoading />
+              {busy && <AiLoading />}
             </div>
           )}
 
@@ -799,39 +778,49 @@ export function LeadWorkspace({
                     ))}
                   </div>
                   <div className="inline-form">
-                    <select
-                      value={contactForm.channel}
-                      onChange={(e) =>
-                        setContactForm({
-                          ...contactForm,
-                          channel: e.target.value as Contact["channel"],
-                        })
-                      }
-                    >
-                      <option>email</option>
-                      <option>whatsapp</option>
-                      <option>phone</option>
-                    </select>
-                    <input
-                      placeholder="Contact value"
-                      value={contactForm.value}
-                      onChange={(e) =>
-                        setContactForm({
-                          ...contactForm,
-                          value: e.target.value,
-                        })
-                      }
-                    />
-                    <input
-                      placeholder="Public source URL"
-                      value={contactForm.sourceUrl}
-                      onChange={(e) =>
-                        setContactForm({
-                          ...contactForm,
-                          sourceUrl: e.target.value,
-                        })
-                      }
-                    />
+                    <label>
+                      Contact type
+                      <select
+                        value={contactForm.channel}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            channel: e.target.value as Contact["channel"],
+                          })
+                        }
+                      >
+                        <option>email</option>
+                        <option>whatsapp</option>
+                        <option>phone</option>
+                      </select>
+                    </label>
+                    <label>
+                      Contact detail
+                      <input
+                        placeholder="Email address or phone number"
+                        value={contactForm.value}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            value: e.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Public source
+                      <input
+                        type="url"
+                        placeholder="https://example.com/contact"
+                        value={contactForm.sourceUrl}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            sourceUrl: e.target.value,
+                          })
+                        }
+                      />
+                    </label>
                     <button onClick={addContact}>
                       <Plus />
                       Add verified
@@ -846,7 +835,7 @@ export function LeadWorkspace({
                     <div>
                       <h3>Compliance review</h3>
                       <p>
-                        Required before outreach to uncertain UK businesses.
+                        Required for each lead before outreach outside Nigeria.
                       </p>
                     </div>
                   </div>
@@ -884,7 +873,7 @@ export function LeadWorkspace({
                       </small>
                     </span>
                   </label>
-                  {lead.country === "UK" && (
+                  {lead.country !== "NG" && (
                     <>
                       <label className="field-label">
                         Outreach basis
@@ -924,15 +913,8 @@ export function LeadWorkspace({
                         </label>
                       )}
                       <small>
-                        Social DMs count as electronic marketing. See the{" "}
-                        <a
-                          href="https://ico.org.uk/for-organisations/direct-marketing-and-privacy-and-electronic-communications/business-to-business-marketing/"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          ICO B2B guidance
-                        </a>
-                        .
+                        This records your review; it does not automatically
+                        determine whether outreach is lawful in this market.
                       </small>
                     </>
                   )}
@@ -1003,7 +985,7 @@ export function LeadWorkspace({
                               <span>{link.confidence}% match</span>
                             </div>
                             <a href={link.url} target="_blank" rel="noreferrer">
-                              {new URL(link.url).hostname.replace(/^www\./, "")}
+                              {displayHostname(link.url)}
                               <ExternalLink />
                             </a>
                             <small>{link.evidence}</small>
@@ -1179,33 +1161,41 @@ export function LeadWorkspace({
                 </div>
                 {selectedDraft ? (
                   <>
-                    <input
-                      className="subject-input"
-                      value={selectedDraft.subject ?? ""}
-                      hidden={selectedDraft.subject === null}
-                      onChange={(e) =>
-                        setDrafts((rows) =>
-                          rows.map((row) =>
-                            row.id === selectedDraft.id
-                              ? { ...row, subject: e.target.value }
-                              : row,
-                          ),
-                        )
-                      }
-                    />
-                    <textarea
-                      value={selectedDraft.body}
-                      disabled={Boolean(selectedDraft.sentAt)}
-                      onChange={(e) =>
-                        setDrafts((rows) =>
-                          rows.map((row) =>
-                            row.id === selectedDraft.id
-                              ? { ...row, body: e.target.value }
-                              : row,
-                          ),
-                        )
-                      }
-                    />
+                    {selectedDraft.subject !== null && (
+                      <label className="editor-field">
+                        Subject
+                        <input
+                          className="subject-input"
+                          value={selectedDraft.subject}
+                          disabled={Boolean(selectedDraft.sentAt)}
+                          onChange={(e) =>
+                            setDrafts((rows) =>
+                              rows.map((row) =>
+                                row.id === selectedDraft.id
+                                  ? { ...row, subject: e.target.value }
+                                  : row,
+                              ),
+                            )
+                          }
+                        />
+                      </label>
+                    )}
+                    <label className="editor-field">
+                      Message
+                      <textarea
+                        value={selectedDraft.body}
+                        disabled={Boolean(selectedDraft.sentAt)}
+                        onChange={(e) =>
+                          setDrafts((rows) =>
+                            rows.map((row) =>
+                              row.id === selectedDraft.id
+                                ? { ...row, body: e.target.value }
+                                : row,
+                            ),
+                          )
+                        }
+                      />
+                    </label>
                     <div className="editor-footer">
                       <span>{selectedDraft.body.length} characters</span>
                       <div>
@@ -1250,7 +1240,6 @@ export function LeadWorkspace({
                           selectedDraft.channel === "linkedin"
                             ? `Copy and open ${selectedDraft.channel}`
                             : `Open ${selectedDraft.channel}`}
-                          <ChevronDown />
                         </button>
                         {!selectedDraft.sentAt && (
                           <button onClick={() => markSent(selectedDraft)}>
@@ -1294,6 +1283,15 @@ export function LeadWorkspace({
                   <p>Editable scope, price and trust-first terms.</p>
                 </div>
               </div>
+              {!opportunity && (
+                <div className="inline-warning" role="status">
+                  <Info />
+                  <span>
+                    Qualify this lead first so HUSTLE can create an opportunity
+                    record for its proposal and pricing snapshot.
+                  </span>
+                </div>
+              )}
               <div className="form-grid-modern">
                 <label>
                   Proposal title
@@ -1311,20 +1309,24 @@ export function LeadWorkspace({
                   Package
                   <select
                     value={proposalForm.packageName}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const selected = campaignPackages.find(
+                        (item) => item.name === e.target.value,
+                      );
                       setProposalForm({
                         ...proposalForm,
                         packageName: e.target.value,
-                      })
-                    }
+                        valueMinor: selected?.price ?? proposalForm.valueMinor,
+                      });
+                    }}
                   >
-                    {PACKAGES[lead.country as "NG" | "UK"].map((item) => (
+                    {campaignPackages.map((item) => (
                       <option key={item.name}>{item.name}</option>
                     ))}
                   </select>
                 </label>
                 <label>
-                  Price ({defaultPackage.currency})
+                  Price ({proposalCurrency})
                   <input
                     type="number"
                     value={proposalForm.valueMinor}
@@ -1377,7 +1379,11 @@ export function LeadWorkspace({
                   <FileText />
                   Print
                 </button>
-                <button className="primary-action" onClick={saveProposal}>
+                <button
+                  className="primary-action"
+                  onClick={saveProposal}
+                  disabled={!opportunity}
+                >
                   <Save />
                   Save proposal
                 </button>
@@ -1408,8 +1414,16 @@ export function LeadWorkspace({
                   }
                 />
               </label>
+              {!opportunity && (
+                <small className="action-help">
+                  A qualified opportunity is required before a preview can be
+                  recorded.
+                </small>
+              )}
               <div>
-                <button onClick={recordPreview}>Record preview</button>
+                <button onClick={recordPreview} disabled={!opportunity}>
+                  Record preview
+                </button>
                 <button
                   className="primary-action"
                   disabled={
@@ -1443,7 +1457,7 @@ export function LeadWorkspace({
               <div className="payment-total">
                 <span>Amount due</span>
                 <strong>
-                  {defaultPackage.currency}{" "}
+                  {proposalCurrency}{" "}
                   {Number(proposalForm.valueMinor).toLocaleString()}
                 </strong>
               </div>
@@ -1474,93 +1488,25 @@ export function LeadWorkspace({
           )}
         </main>
 
-        <aside className="deal-rail">
-          <section>
-            <div className="rail-heading">
-              <h3>Activity</h3>
-              <span>Latest</span>
-            </div>
-            <div className="activity-line">
-              {activities.length ? (
-                activities.slice(0, 5).map((item) => (
-                  <article key={item.id}>
-                    <span>
-                      <Check />
-                    </span>
-                    <div>
-                      <b>{item.type.replaceAll("_", " ")}</b>
-                      <p>{item.detail}</p>
-                      <small>{new Date(item.createdAt).toLocaleString()}</small>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <div className="rail-empty">No activity recorded yet.</div>
-              )}
-            </div>
-          </section>
-          <section>
-            <div className="rail-heading">
-              <h3>Deal summary</h3>
-              <button onClick={() => updateLead({ stage: lead.stage })}>
-                Save stage
-              </button>
-            </div>
-            <dl>
-              <div>
-                <dt>Business</dt>
-                <dd>{lead.name}</dd>
-              </div>
-              <div>
-                <dt>Market</dt>
-                <dd>
-                  {lead.city}, {lead.country}
-                </dd>
-              </div>
-              <div>
-                <dt>Opportunity score</dt>
-                <dd>{lead.score}/100</dd>
-              </div>
-              <div>
-                <dt>Estimated value</dt>
-                <dd>
-                  {defaultPackage.currency}{" "}
-                  {Number(proposalForm.valueMinor).toLocaleString()}
-                </dd>
-              </div>
-              <div>
-                <dt>Stage</dt>
-                <dd>{lead.stage.replaceAll("_", " ")}</dd>
-              </div>
-              <div>
-                <dt>Source</dt>
-                <dd>
-                  <a href={lead.sourceUrl} target="_blank" rel="noreferrer">
-                    Public listing <ArrowUpRight />
-                  </a>
-                </dd>
-              </div>
-            </dl>
-            <button className="danger-link" onClick={optOut}>
-              <ShieldX />
-              Permanently opt out
-            </button>
-          </section>
-        </aside>
+        <DealRail
+          lead={lead}
+          activities={activities}
+          currency={proposalCurrency}
+          estimatedValue={Number(proposalForm.valueMinor)}
+          onOptOut={optOut}
+        />
       </div>
+    </div>
     </div>
   );
 }
 
-function stageDescription(stage: WorkflowStage) {
-  return {
-    audit: "Confirm the opportunity with evidence from the public website.",
-    contact: "Verify a safe public business contact before outreach.",
-    pitch: "Start the conversation with a clear, personal message.",
-    proposal: "Turn interest into a clear scope and price.",
-    preview: "Deliver value through a restricted working preview.",
-    payment: "Record approval and payment before handover.",
-  }[stage];
+function displayHostname(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./, "");
+  } catch {
+    return value.replace(/^https?:\/\//, "").slice(0, 60);
+  }
 }
 
 function InfoPanel({
@@ -1587,15 +1533,15 @@ function AiLoading() {
   return (
     <section className="surface-panel ai-loading">
       <h3>
-        <Sparkles />
-        Suggested next angles
+        <LoaderCircle className="spin" />
+        Reviewing public evidence
       </h3>
       <div>
         <i />
         <i />
         <i />
       </div>
-      <small>Preparing evidence-backed suggestions…</small>
+      <small>This may take a moment.</small>
     </section>
   );
 }
@@ -1629,18 +1575,21 @@ function FollowUp({
         <button onClick={() => prepare(item)}>Prepare follow-up</button>
       ) : (
         <>
-          <textarea
-            value={item.followUpBody}
-            onChange={(e) =>
-              setDrafts((rows) =>
-                rows.map((row) =>
-                  row.id === item.id
-                    ? { ...row, followUpBody: e.target.value }
-                    : row,
-                ),
-              )
-            }
-          />
+          <label className="editor-field">
+            Follow-up message
+            <textarea
+              value={item.followUpBody}
+              onChange={(e) =>
+                setDrafts((rows) =>
+                  rows.map((row) =>
+                    row.id === item.id
+                      ? { ...row, followUpBody: e.target.value }
+                      : row,
+                  ),
+                )
+              }
+            />
+          </label>
           <div>
             <button onClick={() => save(item)}>Save</button>
             <button onClick={() => open(item, true)}>

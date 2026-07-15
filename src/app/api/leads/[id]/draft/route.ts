@@ -7,6 +7,7 @@ import {
   audits,
   businessLinks,
   businesses,
+  campaigns,
   contacts,
   findings,
   outreachDrafts,
@@ -14,13 +15,13 @@ import {
   pitchVariants,
   suppressions,
 } from "@/db/schema";
-import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
 import type { AuditFinding } from "@/lib/audit";
 import { OUTREACH_CHANNELS } from "@/lib/constants";
 import { withDatabaseRetry } from "@/lib/db-retry";
 import { generatePitchVariantParts } from "@/lib/gemini";
 import { id } from "@/lib/ids";
-import { ukOutreachBlockReason } from "@/lib/outreach-compliance";
+import { outreachBlockReason } from "@/lib/outreach-compliance";
 import { aggregatePitchStyleSignals } from "@/lib/pitch-learning";
 import {
   buildFallbackPitchParts,
@@ -38,7 +39,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireOwner())) return unauthorized();
+  if (!(await requireUser())) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
 
   try {
@@ -52,7 +53,21 @@ export async function POST(
     if (business.suppressed)
       return NextResponse.json({ error: "Lead is suppressed" }, { status: 409 });
 
-    const complianceError = ukOutreachBlockReason(business);
+    const campaign = await withDatabaseRetry(() =>
+      db.query.campaigns.findFirst({
+        where: eq(campaigns.id, business.campaignId),
+      }),
+    );
+    if (!campaign)
+      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+
+    const complianceError = outreachBlockReason({
+      ...business,
+      channel: input.channel,
+      campaignComplianceReviewedAt: campaign.complianceReviewedAt,
+      campaignComplianceNote: campaign.complianceNote,
+      approvedChannels: campaign.approvedChannels,
+    });
     if (complianceError)
       return NextResponse.json({ error: complianceError }, { status: 409 });
 

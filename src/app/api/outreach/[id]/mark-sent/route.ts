@@ -5,21 +5,22 @@ import {
   activities,
   businessLinks,
   businesses,
+  campaigns,
   contacts,
   outreachDrafts,
   suppressions,
 } from "@/db/schema";
-import { apiError, notConfigured, requireOwner, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
 import { withDatabaseRetry } from "@/lib/db-retry";
 import { addBusinessDays } from "@/lib/drafts";
 import { id } from "@/lib/ids";
-import { ukOutreachBlockReason } from "@/lib/outreach-compliance";
+import { outreachBlockReason } from "@/lib/outreach-compliance";
 
 export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireOwner())) return unauthorized();
+  if (!(await requireUser())) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
 
   try {
@@ -48,7 +49,20 @@ export async function POST(
         { error: "Suppressed contacts cannot be messaged" },
         { status: 409 },
       );
-    const complianceError = ukOutreachBlockReason(business);
+    const campaign = await withDatabaseRetry(() =>
+      db.query.campaigns.findFirst({
+        where: eq(campaigns.id, business.campaignId),
+      }),
+    );
+    if (!campaign)
+      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+    const complianceError = outreachBlockReason({
+      ...business,
+      channel: draft.channel,
+      campaignComplianceReviewedAt: campaign.complianceReviewedAt,
+      campaignComplianceNote: campaign.complianceNote,
+      approvedChannels: campaign.approvedChannels,
+    });
     if (complianceError)
       return NextResponse.json({ error: complianceError }, { status: 409 });
 

@@ -4,15 +4,15 @@ A private, human-approved lead discovery and outreach workspace for finding hosp
 
 ## What is implemented
 
-- Nigeria and UK Google Places campaigns with result and budget caps
+- Worldwide, city-based Google Places campaigns with result and budget caps
 - Turso/libSQL database with Drizzle schema and versioned migrations
-- Single-owner Google authentication through Auth.js
+- Google authentication for any user with a Google account through Auth.js
 - SSRF-safe website auditing, deterministic opportunity scoring, and stored evidence
 - Capped Gemini 2.5 Flash analysis using anonymized, schema-validated input/output
 - Three evidence-backed Short, Warm, and Specific pitch variants per generation
 - Manual email, WhatsApp, Instagram, and LinkedIn outreach that never sends automatically
 - Aggregate style learning without sending historical messages or business data to Gemini
-- Permanent opt-out suppression and a recorded UK outreach-basis gate
+- Permanent opt-out suppression and campaign-plus-lead compliance gates outside Nigeria
 - One five-business-day follow-up reminder
 - Proposal, staging-preview approval, payment, and handover-unlock states
 - Responsive private dashboard plus read-only demo mode
@@ -31,7 +31,7 @@ pnpm dev
 Fill `.env.local` with:
 
 - Turso connection URL and auth token
-- Google OAuth client ID/secret and the single `OWNER_EMAIL`
+- Google OAuth client ID/secret
 - Google Places API key
 - Gemini API key
 - strong `AUTH_SECRET` and `CRON_SECRET`
@@ -62,6 +62,7 @@ pnpm build
 - Email and WhatsApp open prefilled composers. Social messages are copied before the confirmed business profile opens.
 - Mark a draft sent only after using the real messaging account.
 - Honor objections immediately; suppression is permanent.
-- For UK leads, record confirmed corporate B2B status, documented consent, or a solicited request before drafting.
+- For every market outside Nigeria, record the campaign review, approved channels, lead review, and outreach basis before drafting.
+- Campaign compliance records support human review; they do not automatically determine whether outreach is lawful.
 - Initial outreach asks permission to send a brief idea. No-deposit and preview terms are introduced only after a reply.
 - Customers inspect a restricted staging preview without a deposit. Production deployment, source code, credentials, and ownership transfer only after full payment.

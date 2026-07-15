@@ -68,9 +68,24 @@ export const verificationTokens = sqliteTable(
 export const campaigns = sqliteTable("campaigns", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  country: text("country", { enum: ["NG", "UK"] }).notNull(),
+  country: text("country").notNull(),
   city: text("city").notNull(),
   category: text("category").notNull(),
+  currency: text("currency").notNull().default("NGN"),
+  landingPagePrice: integer("landing_page_price").notNull().default(85000),
+  completeWebsitePrice: integer("complete_website_price")
+    .notNull()
+    .default(220000),
+  bookingCataloguePrice: integer("booking_catalogue_price")
+    .notNull()
+    .default(380000),
+  complianceNote: text("compliance_note"),
+  complianceReference: text("compliance_reference"),
+  approvedChannels: text("approved_channels", { mode: "json" })
+    .$type<string[]>()
+    .notNull()
+    .default(sql`'[]'`),
+  complianceReviewedAt: text("compliance_reviewed_at"),
   resultLimit: integer("result_limit").notNull().default(20),
   budgetMinor: integer("budget_minor").notNull().default(0),
   spentMinor: integer("spent_minor").notNull().default(0),

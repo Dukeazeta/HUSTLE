@@ -1,0 +1,138 @@
+.page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 48px 24px;
+  background: #ffffff;
+}
+
+.state {
+  width: min(700px, 100%);
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 24px;
+  border-radius: 50%;
+  background: #0052ff;
+  color: #ffffff;
+}
+
+.icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.eyebrow {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eef0f3;
+  color: #5b616e;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.state h1 {
+  max-width: 12ch;
+  margin: 18px 0 0;
+  color: #0a0b0d;
+  font-size: clamp(2.5rem, 8vw, 4rem);
+  font-weight: 400;
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+}
+
+.state p {
+  max-width: 50ch;
+  margin: 20px 0 0;
+  color: #5b616e;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 32px;
+}
+
+.actions a,
+.actions button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  border: 1px solid #dee1e6;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0a0b0d;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.actions button:first-child,
+.actions a:first-child {
+  border-color: #0052ff;
+  background: #0052ff;
+  color: #ffffff;
+}
+
+.actions a:hover,
+.actions button:hover {
+  border-color: #a8b8cc;
+  background: #f7f7f7;
+}
+
+.actions button:first-child:hover,
+.actions a:first-child:hover {
+  border-color: #003ecc;
+  background: #003ecc;
+  color: #ffffff;
+}
+
+@media (max-width: 560px) {
+  .page {
+    padding: 32px 20px;
+  }
+
+  .state h1 {
+    font-size: clamp(2.35rem, 14vw, 3.35rem);
+  }
+
+  .actions {
+    width: 100%;
+  }
+
+  .actions a,
+  .actions button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actions a,
+  .actions button {
+    transition: none;
+  }
+}

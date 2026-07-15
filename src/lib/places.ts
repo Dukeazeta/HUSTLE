@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { countryName, googleRegionCode } from "./markets";
 
 const placeSchema = z.object({
   id: z.string(),
@@ -34,9 +35,23 @@ export function preferredPlacePhone(place: {
   return place.internationalPhoneNumber ?? place.nationalPhoneNumber ?? null;
 }
 
+export function buildPlacesSearchRequest(input: {
+  city: string;
+  country: string;
+  category: string;
+  limit: number;
+}) {
+  return {
+    textQuery: `${input.category.replaceAll("_", " ")} in ${input.city}, ${countryName(input.country)}`,
+    pageSize: Math.min(input.limit, 20),
+    languageCode: "en",
+    regionCode: googleRegionCode(input.country),
+  };
+}
+
 export async function searchPlaces(input: {
   city: string;
-  country: "NG" | "UK";
+  country: string;
   category: string;
   limit: number;
 }) {
@@ -52,12 +67,7 @@ export async function searchPlaces(input: {
         "X-Goog-FieldMask":
           "places.id,places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.rating,places.userRatingCount,places.googleMapsUri,places.primaryType",
       },
-      body: JSON.stringify({
-        textQuery: `${input.category.replaceAll("_", " ")} in ${input.city}, ${input.country === "NG" ? "Nigeria" : "United Kingdom"}`,
-        pageSize: Math.min(input.limit, 20),
-        languageCode: "en",
-        regionCode: input.country === "NG" ? "NG" : "GB",
-      }),
+      body: JSON.stringify(buildPlacesSearchRequest(input)),
       signal: AbortSignal.timeout(12_000),
     },
   );

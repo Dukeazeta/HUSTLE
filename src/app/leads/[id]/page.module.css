@@ -1,0 +1,25 @@
+.backLink {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-strong);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 160ms ease, transform 160ms var(--ease-out);
+}
+
+.backLink:hover {
+  background: var(--hairline);
+  transform: translateY(-1px);
+}
+
+.backLink svg {
+  width: 16px;
+  height: 16px;
+}
