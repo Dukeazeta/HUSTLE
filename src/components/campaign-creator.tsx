@@ -2,6 +2,12 @@
 
 import { useCallback, useState } from "react";
 import { Plus, Search } from "lucide-react";
+import {
+  CATEGORY_MAX_LENGTH,
+  CATEGORY_SUGGESTIONS,
+  categoryLabel,
+  normalizeCategory,
+} from "@/lib/categories";
 import { MARKETS } from "@/lib/markets";
 import { Combobox } from "@/components/ui/combobox";
 import { Dialog } from "@/components/ui/dialog";
@@ -20,6 +26,8 @@ export function CampaignCreator({ configured }: { configured: boolean }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [country, setCountry] = useState("NG");
+  const [category, setCategory] = useState("restaurant");
+  const selectedSlug = normalizeCategory(category);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -32,6 +40,10 @@ export function CampaignCreator({ configured }: { configured: boolean }) {
     event.preventDefault();
     if (!country) {
       setMessage("Choose a country from the results.");
+      return;
+    }
+    if (!normalizeCategory(category)) {
+      setMessage(`Enter a business type of 2 to ${CATEGORY_MAX_LENGTH} letters, like "dental clinic".`);
       return;
     }
 
@@ -47,7 +59,7 @@ export function CampaignCreator({ configured }: { configured: boolean }) {
           name: form.get("name"),
           country,
           city: form.get("city"),
-          category: form.get("category"),
+          category,
           resultLimit: Number(form.get("resultLimit")),
           budgetMinor: Number(form.get("budgetMinor")),
         }),
@@ -83,7 +95,7 @@ export function CampaignCreator({ configured }: { configured: boolean }) {
         open={open}
         onClose={close}
         title="Create a campaign"
-        description="Choose one market and business category to begin finding leads."
+        description="Pick a city and any kind of business to start finding leads."
         footer={
           <div className={styles.actions}>
             <button type="button" className={styles.cancel} onClick={close}>
@@ -133,18 +145,36 @@ export function CampaignCreator({ configured }: { configured: boolean }) {
               City
               <input name="city" placeholder="Lagos" required />
             </label>
-            <label className={styles.wide}>
-              Business category
-              <select name="category" defaultValue="restaurant">
-                <option value="restaurant">Restaurants</option>
-                <option value="hotel">Hotels</option>
-                <option value="salon">Salons</option>
-                <option value="spa">Spas</option>
-                <option value="caterer">Caterers</option>
-                <option value="event_venue">Event venues</option>
-                <option value="beauty">Beauty businesses</option>
-              </select>
-            </label>
+            <div className={`${styles.wide} ${styles.categoryField}`}>
+              <label>
+                Business type
+                <input
+                  name="category"
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value)}
+                  placeholder="e.g. dental clinic, gym, law firm"
+                  maxLength={CATEGORY_MAX_LENGTH}
+                  autoComplete="off"
+                  required
+                />
+              </label>
+              <div className={styles.suggestions} role="group" aria-label="Suggested business types">
+                {CATEGORY_SUGGESTIONS.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    className={styles.suggestion}
+                    aria-pressed={selectedSlug === suggestion}
+                    onClick={() => setCategory(categoryLabel(suggestion))}
+                  >
+                    {categoryLabel(suggestion)}
+                  </button>
+                ))}
+              </div>
+              <p className={styles.fieldHelp}>
+                Any kind of business works. HUSTLE searches Google for it in your city.
+              </p>
+            </div>
           </div>
 
           <details className={styles.advanced}>

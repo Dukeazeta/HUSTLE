@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { promptCategory } from "@/lib/categories";
 import { z } from "zod";
 import type { AuditFinding } from "./audit";
 import type { OutreachChannel } from "./constants";
@@ -60,18 +61,7 @@ export function buildPitchPrompt(input: {
   styleSignals: PitchStyleSignals;
   repairReason?: string;
 }) {
-  const safeCategories = new Set([
-    "restaurant",
-    "hotel",
-    "salon",
-    "spa",
-    "caterer",
-    "event_venue",
-    "beauty",
-  ]);
-  const category = safeCategories.has(input.category)
-    ? input.category.replaceAll("_", " ")
-    : "local business";
+  const category = promptCategory(input.category);
   const country = countryName(input.country);
   const repair = input.repairReason
     ? `\nThe previous response was rejected for this reason: ${input.repairReason}. Correct it without adding new facts.`
@@ -181,7 +171,7 @@ export async function draftNaturalPitch(input: {
   const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const response = await client.models.generateContent({
     model: geminiModel(),
-    contents: `Write two short pieces of a cold ${input.channel} message for an anonymous ${input.category} business in ${input.country}. Use only this evidence: ${JSON.stringify(evidence)}
+    contents: `Write two short pieces of a cold ${input.channel} message for an anonymous ${promptCategory(input.category)} business in ${input.country}. Use only this evidence: ${JSON.stringify(evidence)}
 
 First draft it, then silently ask what still sounds AI-generated, and rewrite before returning JSON.
 
@@ -240,7 +230,7 @@ export async function analyzeFindings(input: {
   );
   const response = await client.models.generateContent({
     model: geminiModel(),
-    contents: `Analyze this anonymized website audit for a ${input.category} in market ${input.country}. Use only supplied evidence. Keep summary at 500 characters or fewer and pitchAngle at 300 characters or fewer. Score: ${input.score}. Evidence: ${JSON.stringify(evidence)}`,
+    contents: `Analyze this anonymized website audit for a ${promptCategory(input.category)} in market ${input.country}. Use only supplied evidence. Keep summary at 500 characters or fewer and pitchAngle at 300 characters or fewer. Score: ${input.score}. Evidence: ${JSON.stringify(evidence)}`,
     config: {
       responseMimeType: "application/json",
       responseJsonSchema: {
