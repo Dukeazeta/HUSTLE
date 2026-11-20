@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/db";
 import { businesses, campaigns, contacts } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, unauthorized } from "@/lib/api";
+import { getOwnedCampaign } from "@/lib/ownership";
+import { assertDailyCap, recordUsage } from "@/lib/usage";
+import { requireWorkspace } from "@/lib/workspace";
 import { id, normalizeDomain, normalizePhone } from "@/lib/ids";
 import { preferredPlacePhone, searchPlaces } from "@/lib/places";
 
@@ -10,13 +13,12 @@ export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const campaignId = (await params).id;
-    const campaign = await db.query.campaigns.findFirst({
-      where: eq(campaigns.id, campaignId),
-    });
+    const campaign = await getOwnedCampaign(workspace.workspaceId, campaignId);
     if (!campaign)
       return NextResponse.json(
         { error: "Campaign not found" },
@@ -38,12 +40,14 @@ export async function POST(
         { error: "Campaign budget limit reached" },
         { status: 409 },
       );
+    await assertDailyCap(workspace.workspaceId, "places_search");
     const places = await searchPlaces({
       city: campaign.city,
       country: campaign.country,
       category: campaign.category,
       limit: campaign.resultLimit,
     });
+    await recordUsage(workspace.workspaceId, "places_search");
     let imported = 0;
     for (const place of places) {
       const sourceUrl =
@@ -54,6 +58,7 @@ export async function POST(
         .insert(businesses)
         .values({
           id: id("biz"),
+          workspaceId: workspace.workspaceId,
           campaignId,
           placeId: place.id,
           name: place.displayName.text,
@@ -69,7 +74,9 @@ export async function POST(
           sourceUrl,
           sourceDiscoveredAt: new Date().toISOString(),
         })
-        .onConflictDoNothing({ target: businesses.placeId })
+        .onConflictDoNothing({
+          target: [businesses.workspaceId, businesses.placeId],
+        })
         .returning({ id: businesses.id });
 
       const businessId =
@@ -77,7 +84,10 @@ export async function POST(
         (
           await db.query.businesses.findFirst({
             columns: { id: true },
-            where: eq(businesses.placeId, place.id),
+            where: and(
+              eq(businesses.workspaceId, workspace.workspaceId),
+              eq(businesses.placeId, place.id),
+            ),
           })
         )?.id;
 

@@ -3,7 +3,8 @@ import { z } from "zod";
 
 vi.mock("@/auth", () => ({ auth: vi.fn(async () => null) }));
 
-const { apiError, notConfigured, parseBody, requireUser, UserError } = await import("./api");
+const { apiError, notConfigured, parseBody, UserError } = await import("./api");
+const { requireWorkspace } = await import("./workspace");
 const { isDemoMode } = await import("./demo");
 
 const jsonRequest = (body: string) =>
@@ -60,7 +61,10 @@ describe("demo mode", () => {
     vi.stubEnv("DEMO_MODE", "true");
     vi.stubEnv("VERCEL_ENV", "");
     expect(isDemoMode()).toBe(true);
-    expect(await requireUser()).toEqual({ email: "demo@hustle.local" });
+    expect(await requireWorkspace()).toMatchObject({
+      email: "demo@hustle.local",
+      workspaceId: "ws_demo",
+    });
     const response = notConfigured("Turso");
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: "Demo data is read-only" });
@@ -71,7 +75,7 @@ describe("demo mode", () => {
     vi.stubEnv("DEMO_MODE", "true");
     vi.stubEnv("VERCEL_ENV", "production");
     expect(isDemoMode()).toBe(false);
-    expect(await requireUser()).toBeNull();
+    expect(await requireWorkspace()).toBeNull();
     expect(notConfigured("Turso").status).toBe(503);
   });
 });

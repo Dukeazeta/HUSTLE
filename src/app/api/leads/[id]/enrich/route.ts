@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { and, count, desc, eq, gte, ne } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/db";
 import { activities, businessLinks, businesses } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, unauthorized } from "@/lib/api";
+import { getOwnedBusiness } from "@/lib/ownership";
+import { envLimit, utcDayStart } from "@/lib/usage";
+import { requireWorkspace } from "@/lib/workspace";
 import { id } from "@/lib/ids";
 import { searchPublicBusinessPresence } from "@/lib/web-enrichment";
 
@@ -10,21 +13,18 @@ export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   if (!process.env.BRAVE_SEARCH_API_KEY) return notConfigured("Brave Search");
 
   try {
     const businessId = (await params).id;
-    const business = await db.query.businesses.findFirst({
-      where: eq(businesses.id, businessId),
-    });
+    const business = await getOwnedBusiness(workspace.workspaceId, businessId);
     if (!business)
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
 
-    const start = new Date();
-    start.setUTCHours(0, 0, 0, 0);
-    const dayStart = start.toISOString().slice(0, 10);
+    const dayStart = utcDayStart();
     const cachedSearch = await db.query.activities.findFirst({
       where: and(
         eq(activities.businessId, businessId),
@@ -51,13 +51,15 @@ export async function POST(
     const [usage] = await db
       .select({ value: count() })
       .from(activities)
+      .innerJoin(businesses, eq(activities.businessId, businesses.id))
       .where(
         and(
+          eq(businesses.workspaceId, workspace.workspaceId),
           eq(activities.type, "web_enrichment"),
           gte(activities.createdAt, dayStart),
         ),
       );
-    const dailyLimit = Math.max(1, Number(process.env.BRAVE_DAILY_LIMIT ?? 30));
+    const dailyLimit = Math.max(1, envLimit("BRAVE_DAILY_LIMIT", 30));
     if (usage.value >= dailyLimit)
       return NextResponse.json(
         { error: "Daily public-web search limit reached" },

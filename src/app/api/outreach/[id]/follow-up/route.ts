@@ -3,7 +3,9 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import { outreachDrafts } from "@/db/schema";
-import { apiError, notConfigured, parseBody, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, unauthorized } from "@/lib/api";
+import { getOwnedDraft } from "@/lib/ownership";
+import { requireWorkspace } from "@/lib/workspace";
 import { buildFollowUp } from "@/lib/workflow";
 
 const editSchema = z.object({
@@ -14,15 +16,16 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const draftId = (await params).id;
     const input = await parseBody(request, editSchema, {});
-    const draft = await db.query.outreachDrafts.findFirst({
-      where: eq(outreachDrafts.id, draftId),
-    });
-    if (!draft || !draft.sentAt)
+    const draft = await getOwnedDraft(workspace.workspaceId, draftId);
+    if (!draft)
+      return NextResponse.json({ error: "Draft not found" }, { status: 404 });
+    if (!draft.sentAt)
       return NextResponse.json(
         { error: "Send the original message before preparing a follow-up" },
         { status: 409 },

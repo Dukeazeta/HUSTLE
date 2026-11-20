@@ -1,4 +1,5 @@
-import { desc } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import { desc, eq } from "drizzle-orm";
 import { Target } from "lucide-react";
 import { db, isDatabaseConfigured } from "@/db";
 import { campaigns } from "@/db/schema";
@@ -8,13 +9,20 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { demoCampaigns } from "@/lib/demo-data";
 import styles from "./page.module.css";
+import { requireWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
 export default async function CampaignsPage() {
+  const workspace = await requireWorkspace();
+  if (!workspace) redirect("/login");
   const configured = isDatabaseConfigured();
   const rows = configured
-    ? await db.select().from(campaigns).orderBy(desc(campaigns.createdAt))
+    ? await db
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.workspaceId, workspace.workspaceId))
+        .orderBy(desc(campaigns.createdAt))
     : demoCampaigns;
   const activeCount = rows.filter((campaign) => campaign.status === "active").length;
 

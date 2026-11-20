@@ -12,7 +12,8 @@ import {
   pitchVariants,
   suppressions,
 } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, unauthorized } from "@/lib/api";
+import { requireWorkspace } from "@/lib/workspace";
 import { withDatabaseRetry } from "@/lib/db-retry";
 import { id } from "@/lib/ids";
 import { outreachBlockReason } from "@/lib/outreach-compliance";
@@ -21,7 +22,8 @@ export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
 
   try {
@@ -44,7 +46,12 @@ export async function POST(
           eq(pitchGenerations.businessId, businesses.id),
         )
         .innerJoin(campaigns, eq(businesses.campaignId, campaigns.id))
-        .where(eq(pitchVariants.id, variantId))
+        .where(
+          and(
+            eq(pitchVariants.id, variantId),
+            eq(businesses.workspaceId, workspace.workspaceId),
+          ),
+        )
         .limit(1),
     );
     if (!record)

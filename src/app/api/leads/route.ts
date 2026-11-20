@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/db";
 import { businesses, campaigns } from "@/db/schema";
-import { requireUser, unauthorized } from "@/lib/api";
+import { unauthorized } from "@/lib/api";
+import { requireWorkspace } from "@/lib/workspace";
 
 export async function GET() {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return NextResponse.json({ leads: [] });
   const leads = await db
     .select({
@@ -22,6 +24,7 @@ export async function GET() {
     })
     .from(businesses)
     .leftJoin(campaigns, eq(businesses.campaignId, campaigns.id))
+    .where(eq(businesses.workspaceId, workspace.workspaceId))
     .orderBy(desc(businesses.updatedAt))
     .limit(200);
   return NextResponse.json({ leads });

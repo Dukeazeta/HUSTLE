@@ -3,7 +3,9 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import { activities, businessLinks, businesses } from "@/db/schema";
-import { apiError, notConfigured, parseBody, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, unauthorized } from "@/lib/api";
+import { getOwnedBusiness } from "@/lib/ownership";
+import { requireWorkspace } from "@/lib/workspace";
 import { assertPublicUrl } from "@/lib/audit";
 import { id, normalizeDomain } from "@/lib/ids";
 
@@ -13,12 +15,18 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string; linkId: string }> },
 ) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
 
   try {
     const { id: businessId, linkId } = await params;
     const input = await parseBody(request, inputSchema);
+    if (!(await getOwnedBusiness(workspace.workspaceId, businessId)))
+      return NextResponse.json(
+        { error: "Candidate link not found" },
+        { status: 404 },
+      );
     const link = await db.query.businessLinks.findFirst({
       where: and(
         eq(businessLinks.id, linkId),

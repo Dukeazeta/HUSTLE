@@ -10,7 +10,9 @@ import {
   outreachDrafts,
   suppressions,
 } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, unauthorized } from "@/lib/api";
+import { getOwnedDraft } from "@/lib/ownership";
+import { requireWorkspace } from "@/lib/workspace";
 import { withDatabaseRetry } from "@/lib/db-retry";
 import { addBusinessDays } from "@/lib/drafts";
 import { id } from "@/lib/ids";
@@ -20,15 +22,14 @@ export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
 
   try {
     const draftId = (await params).id;
     const draft = await withDatabaseRetry(() =>
-      db.query.outreachDrafts.findFirst({
-        where: eq(outreachDrafts.id, draftId),
-      }),
+      getOwnedDraft(workspace.workspaceId, draftId),
     );
     if (!draft)
       return NextResponse.json({ error: "Draft not found" }, { status: 404 });

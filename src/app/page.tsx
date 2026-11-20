@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { and, desc, eq, isNotNull, lte } from "drizzle-orm";
 import { ArrowUpRight, MapPin, Target } from "lucide-react";
@@ -9,15 +10,19 @@ import { FollowUpQueue } from "@/components/follow-up-queue";
 import { demoCampaigns, demoLeads } from "@/lib/demo-data";
 import { countryName } from "@/lib/markets";
 import styles from "./page.module.css";
+import { requireWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
+  const workspace = await requireWorkspace();
+  if (!workspace) redirect("/login");
   const configured = isDatabaseConfigured();
   const campaignRows = configured
     ? await db
         .select()
         .from(campaigns)
+        .where(eq(campaigns.workspaceId, workspace.workspaceId))
         .orderBy(desc(campaigns.createdAt))
         .limit(6)
     : demoCampaigns;
@@ -37,6 +42,7 @@ export default async function Home() {
         })
         .from(businesses)
         .leftJoin(campaigns, eq(businesses.campaignId, campaigns.id))
+        .where(eq(businesses.workspaceId, workspace.workspaceId))
         .orderBy(desc(businesses.updatedAt))
         .limit(30)
     : demoLeads;
@@ -54,6 +60,7 @@ export default async function Home() {
         .innerJoin(businesses, eq(outreachDrafts.businessId, businesses.id))
         .where(
           and(
+            eq(businesses.workspaceId, workspace.workspaceId),
             eq(outreachDrafts.status, "sent"),
             eq(businesses.suppressed, false),
             isNotNull(outreachDrafts.followUpDueAt),

@@ -1,20 +1,11 @@
 import { NextResponse } from "next/server";
 import type { ZodError, ZodType, output } from "zod";
-import { auth } from "@/auth";
-import { DEMO_USER, isDemoMode } from "@/lib/demo";
+import { isDemoMode } from "@/lib/demo";
 import { UserError } from "@/lib/errors";
 
 export { UserError };
 
 export const GENERIC_ERROR = "Something went wrong. Your saved data is unchanged.";
-
-export async function requireUser() {
-  if (isDemoMode()) return { email: DEMO_USER.email };
-  const session = await auth();
-  const email = session?.user?.email?.toLowerCase();
-  if (!email) return null;
-  return { email };
-}
 
 export const unauthorized = () =>
   NextResponse.json({ error: "Unauthorized" }, { status: 401 });

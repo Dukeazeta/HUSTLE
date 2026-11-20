@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { BriefcaseBusiness } from "lucide-react";
 import { db, isDatabaseConfigured } from "@/db";
@@ -7,10 +8,13 @@ import { PageHeader } from "@/components/layout/page-header";
 import { LeadTable } from "@/components/lead-table";
 import { demoLeads } from "@/lib/demo-data";
 import styles from "./page.module.css";
+import { requireWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
 export default async function LeadsPage() {
+  const workspace = await requireWorkspace();
+  if (!workspace) redirect("/login");
   const configured = isDatabaseConfigured();
   const leads = configured
     ? await db
@@ -28,6 +32,7 @@ export default async function LeadsPage() {
         })
         .from(businesses)
         .leftJoin(campaigns, eq(businesses.campaignId, campaigns.id))
+        .where(eq(businesses.workspaceId, workspace.workspaceId))
         .orderBy(desc(businesses.updatedAt))
         .limit(200)
     : demoLeads;

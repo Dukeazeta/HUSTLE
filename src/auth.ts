@@ -25,5 +25,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     authorized({ auth: session }) {
       return Boolean(session?.user?.email);
     },
+    session({ session, user }) {
+      // Database sessions leave the user id out by default; workspaces need it.
+      if (session.user && user?.id) session.user.id = user.id;
+      return session;
+    },
   },
 });

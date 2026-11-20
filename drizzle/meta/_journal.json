@@ -57,6 +57,13 @@
       "when": 1784100210617,
       "tag": "0007_worldwide_markets",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1795171017112,
+      "tag": "0008_workspaces",
+      "breakpoints": true
     }
   ]
 }

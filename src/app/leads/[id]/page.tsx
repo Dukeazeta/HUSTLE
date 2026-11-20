@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { db, isDatabaseConfigured } from "@/db";
 import {
@@ -21,6 +21,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { LeadWorkspace } from "@/components/lead-workspace";
 import { demoCampaigns, demoLeads } from "@/lib/demo-data";
+import { getOwnedBusiness } from "@/lib/ownership";
+import { requireWorkspace } from "@/lib/workspace";
 import styles from "./page.module.css";
 export const dynamic = "force-dynamic";
 export default async function LeadPage({
@@ -29,9 +31,11 @@ export default async function LeadPage({
   params: Promise<{ id: string }>;
 }) {
   const leadId = (await params).id;
+  const workspace = await requireWorkspace();
+  if (!workspace) redirect("/login");
   const configured = isDatabaseConfigured();
   const lead = configured
-    ? await db.query.businesses.findFirst({ where: eq(businesses.id, leadId) })
+    ? await getOwnedBusiness(workspace.workspaceId, leadId)
     : demoLeads.find((item) => item.id === leadId);
   if (!lead) notFound();
   const liveLead = configured ? (lead as typeof businesses.$inferSelect) : null;

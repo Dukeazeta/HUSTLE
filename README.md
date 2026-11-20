@@ -7,6 +7,8 @@ A private, human-approved lead discovery and outreach workspace for finding hosp
 - Worldwide, city-based Google Places campaigns with result and budget caps
 - Turso/libSQL database with Drizzle schema and versioned migrations
 - Google authentication for any user with a Google account through Auth.js
+- Private workspace per user: every campaign, lead, pitch and payment is scoped to its workspace, and opt-outs are shared across all workspaces
+- Per-workspace daily caps on Places searches, audits, Gemini and Brave calls
 - SSRF-safe website auditing, deterministic opportunity scoring, and stored evidence
 - Capped Gemini 3.8 Flash analysis using anonymized, schema-validated input/output
 - Three evidence-backed Short, Warm, and Specific pitch variants per generation
@@ -39,6 +41,10 @@ Fill `.env.local` with:
 For a credential-free UI preview, set `DEMO_MODE=true`. Demo mode skips sign-in, shows read-only sample data and rejects every change. It is ignored on Vercel production (`VERCEL_ENV=production`), so sign-in stays required there.
 
 ## Database and deployment
+
+Each user gets a private workspace on first sign-in. Data created before workspaces lives in an unclaimed original workspace: set `LEGACY_DATA_OWNER_EMAIL` to your Google email before deploying the workspace migration, and that account claims it on its next sign-in. Nobody else can see it.
+
+Sign-ups are open to any Google account. `PLACES_DAILY_SEARCH_LIMIT`, `AUDIT_DAILY_LIMIT`, `GEMINI_DAILY_LIMIT` and `BRAVE_DAILY_LIMIT` cap each workspace per day (UTC). Also set a daily request quota on the Places API in Google Cloud Console as a hard ceiling across all accounts.
 
 Generate migrations after schema changes with `pnpm db:generate`. Review generated SQL, then apply with `pnpm db:migrate`. Add all variables from `.env.example` to Vercel. `vercel.json` invokes the protected reminder route on weekdays; Vercel must send `Authorization: Bearer $CRON_SECRET`.
 

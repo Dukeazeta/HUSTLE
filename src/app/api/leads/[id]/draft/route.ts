@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, count, desc, eq, gte, or } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import {
@@ -15,7 +15,10 @@ import {
   pitchVariants,
   suppressions,
 } from "@/db/schema";
-import { apiError, notConfigured, parseBody, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, unauthorized } from "@/lib/api";
+import { getOwnedBusiness } from "@/lib/ownership";
+import { envLimit, geminiCallsToday } from "@/lib/usage";
+import { requireWorkspace } from "@/lib/workspace";
 import type { AuditFinding } from "@/lib/audit";
 import { OUTREACH_CHANNELS } from "@/lib/constants";
 import { withDatabaseRetry } from "@/lib/db-retry";
@@ -39,14 +42,15 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
 
   try {
     const businessId = (await params).id;
     const input = await parseBody(request, bodySchema);
     const business = await withDatabaseRetry(() =>
-      db.query.businesses.findFirst({ where: eq(businesses.id, businessId) }),
+      getOwnedBusiness(workspace.workspaceId, businessId),
     );
     if (!business)
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
@@ -149,6 +153,7 @@ export async function POST(
       );
 
     const styleSignals = await loadStyleSignals(
+      workspace.workspaceId,
       business.country,
       input.channel,
     );
@@ -161,7 +166,7 @@ export async function POST(
     let inputTokens = 0;
     let outputTokens = 0;
 
-    if (await hasGeminiCapacity()) {
+    if (await hasGeminiCapacity(workspace.workspaceId)) {
       let repairReason: string | undefined;
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
@@ -227,6 +232,7 @@ export async function POST(
         if (!usedFallback)
           await tx.insert(aiUsage).values({
             id: id("ai"),
+            workspaceId: workspace.workspaceId,
             businessId,
             model: geminiModel(),
             purpose: "pitch_generation",
@@ -295,20 +301,14 @@ async function findChannelTarget(
     : null;
 }
 
-async function hasGeminiCapacity() {
+async function hasGeminiCapacity(workspaceId: string) {
   if (!process.env.GEMINI_API_KEY) return false;
-  const start = new Date();
-  start.setUTCHours(0, 0, 0, 0);
-  const [usage] = await withDatabaseRetry(() =>
-    db
-      .select({ value: count() })
-      .from(aiUsage)
-      .where(gte(aiUsage.createdAt, start.toISOString())),
-  );
-  return usage.value < Number(process.env.GEMINI_DAILY_LIMIT ?? 30);
+  const used = await withDatabaseRetry(() => geminiCallsToday(workspaceId));
+  return used < envLimit("GEMINI_DAILY_LIMIT", 30);
 }
 
 async function loadStyleSignals(
+  workspaceId: string,
   country: string,
   channel: (typeof OUTREACH_CHANNELS)[number],
 ) {
@@ -335,6 +335,7 @@ async function loadStyleSignals(
       )
       .where(
         and(
+          eq(businesses.workspaceId, workspaceId),
           eq(pitchGenerations.channel, channel),
           eq(businesses.country, country),
         ),
