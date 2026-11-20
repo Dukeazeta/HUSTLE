@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "@libsql/client";
 import { readFileSync } from "node:fs";
 import {
@@ -17,7 +17,7 @@ import {
   extractPublicBusinessLinks,
 } from "./web-enrichment";
 import { withDatabaseRetry } from "./db-retry";
-import { buildPitchPrompt } from "./gemini";
+import { buildPitchPrompt, geminiModel } from "./gemini";
 import { outreachBlockReason } from "./outreach-compliance";
 import {
   braveCountryCode,
@@ -345,6 +345,20 @@ describe("pitch generation upgrade", () => {
         new Set(["missing_website"]),
       ),
     ).toThrow();
+  });
+
+  describe("Gemini model selection", () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("defaults to Gemini 3.8 Flash", () => {
+      vi.stubEnv("GEMINI_MODEL", "");
+      expect(geminiModel()).toBe("gemini-3.8-flash");
+    });
+
+    it("lets GEMINI_MODEL override the default", () => {
+      vi.stubEnv("GEMINI_MODEL", "gemini-3.6-flash");
+      expect(geminiModel()).toBe("gemini-3.6-flash");
+    });
   });
 
   it("removes contact data from Gemini prompts", () => {

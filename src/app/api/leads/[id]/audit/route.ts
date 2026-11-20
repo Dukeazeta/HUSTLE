@@ -17,7 +17,7 @@ import {
   calculateOpportunityScore,
   discoveredContactVerification,
 } from "@/lib/audit";
-import { analyzeFindings } from "@/lib/gemini";
+import { analyzeFindings, geminiModel } from "@/lib/gemini";
 import { id, normalizeDomain, normalizePhone } from "@/lib/ids";
 import {
   packageKeyFromName,
@@ -136,7 +136,7 @@ export async function POST(
           await db.insert(aiUsage).values({
             id: id("ai"),
             businessId,
-            model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+            model: geminiModel(),
             purpose: "audit",
             inputTokens: generated.usage?.promptTokenCount ?? 0,
             outputTokens: generated.usage?.candidatesTokenCount ?? 0,

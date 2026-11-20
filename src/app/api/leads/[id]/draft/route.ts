@@ -19,7 +19,7 @@ import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
 import type { AuditFinding } from "@/lib/audit";
 import { OUTREACH_CHANNELS } from "@/lib/constants";
 import { withDatabaseRetry } from "@/lib/db-retry";
-import { generatePitchVariantParts } from "@/lib/gemini";
+import { geminiModel, generatePitchVariantParts } from "@/lib/gemini";
 import { id } from "@/lib/ids";
 import { outreachBlockReason } from "@/lib/outreach-compliance";
 import { aggregatePitchStyleSignals } from "@/lib/pitch-learning";
@@ -206,9 +206,7 @@ export async function POST(
       businessId,
       requestId: input.requestId,
       channel: input.channel,
-      model: usedFallback
-        ? null
-        : process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+      model: usedFallback ? null : geminiModel(),
       usedFallback,
       styleSignals,
     };
@@ -230,7 +228,7 @@ export async function POST(
           await tx.insert(aiUsage).values({
             id: id("ai"),
             businessId,
-            model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+            model: geminiModel(),
             purpose: "pitch_generation",
             inputTokens,
             outputTokens,

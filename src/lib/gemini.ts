@@ -10,6 +10,12 @@ import {
   type PitchVariantParts,
 } from "./pitch-generation";
 
+export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+
+export function geminiModel() {
+  return process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+}
+
 const analysisSchema = z.object({
   summary: z.string().max(500),
   pitchAngle: z.string().max(300),
@@ -102,7 +108,7 @@ export async function generatePitchVariantParts(input: {
   if (!process.env.GEMINI_API_KEY) throw new Error("Gemini API key is missing");
   const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const response = await client.models.generateContent({
-    model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+    model: geminiModel(),
     contents: buildPitchPrompt(input),
     config: {
       responseMimeType: "application/json",
@@ -174,7 +180,7 @@ export async function draftNaturalPitch(input: {
     }));
   const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const response = await client.models.generateContent({
-    model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+    model: geminiModel(),
     contents: `Write two short pieces of a cold ${input.channel} message for an anonymous ${input.category} business in ${input.country}. Use only this evidence: ${JSON.stringify(evidence)}
 
 First draft it, then silently ask what still sounds AI-generated, and rewrite before returning JSON.
@@ -233,7 +239,7 @@ export async function analyzeFindings(input: {
     }),
   );
   const response = await client.models.generateContent({
-    model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+    model: geminiModel(),
     contents: `Analyze this anonymized website audit for a ${input.category} in market ${input.country}. Use only supplied evidence. Keep summary at 500 characters or fewer and pitchAngle at 300 characters or fewer. Score: ${input.score}. Evidence: ${JSON.stringify(evidence)}`,
     config: {
       responseMimeType: "application/json",

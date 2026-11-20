@@ -8,7 +8,7 @@ A private, human-approved lead discovery and outreach workspace for finding hosp
 - Turso/libSQL database with Drizzle schema and versioned migrations
 - Google authentication for any user with a Google account through Auth.js
 - SSRF-safe website auditing, deterministic opportunity scoring, and stored evidence
-- Capped Gemini 2.5 Flash analysis using anonymized, schema-validated input/output
+- Capped Gemini 3.8 Flash analysis using anonymized, schema-validated input/output
 - Three evidence-backed Short, Warm, and Specific pitch variants per generation
 - Manual email, WhatsApp, Instagram, and LinkedIn outreach that never sends automatically
 - Aggregate style learning without sending historical messages or business data to Gemini
