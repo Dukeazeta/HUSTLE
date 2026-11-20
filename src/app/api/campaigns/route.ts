@@ -5,7 +5,7 @@ import { db, isDatabaseConfigured } from "@/db";
 import { campaigns } from "@/db/schema";
 import { apiError, notConfigured, parseBody, unauthorized } from "@/lib/api";
 import { requireWorkspace } from "@/lib/workspace";
-import { CATEGORIES } from "@/lib/constants";
+import { CATEGORY_MAX_LENGTH, normalizeCategory } from "@/lib/categories";
 import { id } from "@/lib/ids";
 import {
   isCountryCode,
@@ -18,7 +18,13 @@ const inputSchema = z.object({
     message: "Select a valid country or territory",
   }),
   city: z.string().min(2).max(80),
-  category: z.enum(CATEGORIES),
+  category: z
+    .string()
+    .max(CATEGORY_MAX_LENGTH * 2)
+    .transform((value) => normalizeCategory(value))
+    .refine((value): value is string => value !== null, {
+      message: `Enter a business type of 2 to ${CATEGORY_MAX_LENGTH} letters, like "dental clinic"`,
+    }),
   resultLimit: z.number().int().min(1).max(60).default(20),
   budgetMinor: z.number().int().min(0).default(0),
 });

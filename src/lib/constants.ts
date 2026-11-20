@@ -13,15 +13,6 @@ export const PIPELINE_STAGES = [
   "lost",
   "do_not_contact",
 ] as const;
-export const CATEGORIES = [
-  "restaurant",
-  "hotel",
-  "salon",
-  "spa",
-  "caterer",
-  "event_venue",
-  "beauty",
-] as const;
 export type PipelineStage = (typeof PIPELINE_STAGES)[number];
 
 export const OUTREACH_CHANNELS = [

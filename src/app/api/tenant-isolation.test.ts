@@ -228,3 +228,34 @@ describe("workspace resolution", () => {
     }
   });
 });
+
+describe("custom business categories", () => {
+  it("saves any business type as a slug in the caller's workspace", async () => {
+    const { POST } = await import("./campaigns/route");
+    const response = await POST(
+      json("POST", {
+        name: "Accra dentists",
+        country: "GH",
+        city: "Accra",
+        category: "  Dental   Clinic ",
+      }),
+    );
+    expect(response.status).toBe(201);
+    const [row] = await db
+      .select()
+      .from(schema.campaigns)
+      .where(eq(schema.campaigns.name, "Accra dentists"));
+    expect(row.category).toBe("dental_clinic");
+    expect(row.workspaceId).not.toBe(B.workspace);
+  });
+
+  it("rejects business types that aren't plain words", async () => {
+    const { POST } = await import("./campaigns/route");
+    for (const category of ["", "x", "gyms; DROP TABLE", "<script>", "a".repeat(51)]) {
+      const response = await POST(
+        json("POST", { name: "Bad type", country: "GH", city: "Accra", category }),
+      );
+      expect(response.status).toBe(400);
+    }
+  });
+});

@@ -1,4 +1,5 @@
 import { lookup } from "node:dns/promises";
+import { isCoreCategory } from "@/lib/categories";
 import { UserError } from "./errors";
 import { normalizePhone } from "./ids";
 import { isPrivateIp, readCapped, safeFetch, type SafeResponse } from "./safe-fetch";
@@ -117,18 +118,7 @@ export function calculateOpportunityScore(input: OpportunityScoreInput) {
 
   if (input.hasAddress) score += 2;
   if (input.hasPlaceId) score += 2;
-  if (
-    [
-      "restaurant",
-      "hotel",
-      "salon",
-      "spa",
-      "caterer",
-      "event_venue",
-      "beauty",
-    ].includes(input.category)
-  )
-    score += 1;
+  if (isCoreCategory(input.category)) score += 1;
 
   return Math.min(100, score);
 }
