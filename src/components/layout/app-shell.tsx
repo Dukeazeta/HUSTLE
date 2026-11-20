@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { LogOut, Menu, X } from "lucide-react";
 import { signOut } from "@/auth";
+import { isDemoMode } from "@/lib/demo";
 import styles from "./app-shell.module.css";
 
 export type AppRoute = "command" | "campaigns" | "leads" | "followups";
@@ -80,6 +81,12 @@ export function AppShell({
 }
 
 function LogoutButton({ mobile = false }: { mobile?: boolean }) {
+  if (isDemoMode())
+    return (
+      <div className={mobile ? styles.mobileLogout : styles.logoutForm}>
+        <span className={styles.demoLabel}>Demo</span>
+      </div>
+    );
   return (
     <form action={logout} className={mobile ? styles.mobileLogout : styles.logoutForm}>
       <button type="submit" className={styles.logoutButton}>

@@ -17,6 +17,7 @@ import {
   extractPublicBusinessLinks,
 } from "./web-enrichment";
 import { withDatabaseRetry } from "./db-retry";
+import { createGuardedLookup, isPrivateIp, readCapped, safeFetch } from "./safe-fetch";
 import { buildPitchPrompt, geminiModel } from "./gemini";
 import { outreachBlockReason } from "./outreach-compliance";
 import {
@@ -569,3 +570,80 @@ describe("worldwide market migration", () => {
     }
   });
 });
+
+describe("private address protection", () => {
+  it("blocks private, reserved and disguised internal addresses", () => {
+    for (const address of [
+      "127.0.0.1",
+      "10.1.2.3",
+      "172.20.0.1",
+      "192.168.1.1",
+      "169.254.169.254",
+      "100.64.0.1",
+      "198.18.0.1",
+      "0.0.0.0",
+      "224.0.0.1",
+      "255.255.255.255",
+      "::",
+      "::1",
+      "fd12::1",
+      "fe80::1",
+      "febf::1",
+      "fec0::1",
+      "ff02::1",
+      "::ffff:127.0.0.1",
+      "::ffff:7f00:1",
+      "64:ff9b::7f00:1",
+      "[::1]",
+      "not-an-ip",
+    ])
+      expect(isPrivateIp(address), address).toBe(true);
+  });
+
+  it("allows ordinary public addresses", () => {
+    for (const address of ["8.8.8.8", "104.16.132.229", "2606:4700::6810:84e5", "2001:4860:4860::8888"])
+      expect(isPrivateIp(address), address).toBe(false);
+  });
+
+  it("refuses to connect when a host resolves to a private address", async () => {
+    const lookup = createGuardedLookup((_host, callback) =>
+      callback(null, [
+        { address: "93.184.216.34", family: 4 },
+        { address: "127.0.0.1", family: 4 },
+      ]),
+    );
+    const error = await new Promise<NodeJS.ErrnoException | null>((resolve) =>
+      lookup("rebind.example", { all: true }, (err) => resolve(err)),
+    );
+    expect(error?.code).toBe("EPRIVATEADDRESS");
+  });
+
+  it("passes public results through in the shape the socket asked for", async () => {
+    const lookup = createGuardedLookup((_host, callback) =>
+      callback(null, [{ address: "93.184.216.34", family: 4 }]),
+    );
+    const single = await new Promise((resolve) =>
+      lookup("example.com", {}, (_err, address, family) => resolve([address, family])),
+    );
+    expect(single).toEqual(["93.184.216.34", 4]);
+  });
+
+  it("refuses private IP literals before any connection is made", async () => {
+    for (const url of ["http://127.0.0.1/", "http://169.254.169.254/latest", "http://[::1]/", "http://[::ffff:7f00:1]/"])
+      await expect(safeFetch(url), url).rejects.toThrow(/private address/);
+  });
+
+  it("stops reading a response body at the byte limit", async () => {
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new TextEncoder().encode("a".repeat(1_000)));
+      },
+    });
+    const text = await readCapped({ body }, 2_500);
+    expect(text.length).toBe(2_500);
+    expect(pulls).toBeLessThan(10);
+  });
+});
+

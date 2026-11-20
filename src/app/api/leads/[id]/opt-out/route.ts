@@ -9,7 +9,7 @@ import {
   outreachDrafts,
   suppressions,
 } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, requireUser, unauthorized } from "@/lib/api";
 import { id } from "@/lib/ids";
 
 const inputSchema = z.object({
@@ -27,9 +27,7 @@ export async function POST(
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const businessId = (await params).id;
-    const { reason } = inputSchema.parse(
-      await request.json().catch(() => ({})),
-    );
+    const { reason } = await parseBody(request, inputSchema, {});
     const business = await db.query.businesses.findFirst({
       where: eq(businesses.id, businessId),
     });

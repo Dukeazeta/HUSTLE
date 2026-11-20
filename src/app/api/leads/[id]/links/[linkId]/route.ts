@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import { activities, businessLinks, businesses } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, requireUser, unauthorized } from "@/lib/api";
 import { assertPublicUrl } from "@/lib/audit";
 import { id, normalizeDomain } from "@/lib/ids";
 
@@ -18,7 +18,7 @@ export async function PATCH(
 
   try {
     const { id: businessId, linkId } = await params;
-    const input = inputSchema.parse(await request.json());
+    const input = await parseBody(request, inputSchema);
     const link = await db.query.businessLinks.findFirst({
       where: and(
         eq(businessLinks.id, linkId),

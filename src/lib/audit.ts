@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { UserError } from "./errors";
 import { normalizePhone } from "./ids";
+import { isPrivateIp, readCapped, safeFetch, type SafeResponse } from "./safe-fetch";
 import {
   extractPublicBusinessLinks,
   type BusinessLinkCandidate,
@@ -69,14 +70,6 @@ function decodeHtml(value: string) {
     .replace(/&nbsp;/gi, " ");
 }
 
-function isPrivateIp(address: string) {
-  if (!isIP(address)) return true;
-  return (
-    /^(10\.|127\.|169\.254\.|192\.168\.|0\.|::1$|fc|fd|fe80)/i.test(address) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(address)
-  );
-}
-
 export async function assertPublicUrl(raw: string) {
   const url = new URL(raw);
   if (
@@ -84,10 +77,10 @@ export async function assertPublicUrl(raw: string) {
     url.username ||
     url.password
   )
-    throw new Error("Unsafe website URL");
-  const records = await lookup(url.hostname, { all: true });
+    throw new UserError("Unsafe website URL");
+  const records = await lookup(url.hostname, { all: true }).catch(() => []);
   if (!records.length || records.some((r) => isPrivateIp(r.address)))
-    throw new Error("Private or unresolved website host");
+    throw new UserError("Private or unresolved website host");
   return url;
 }
 
@@ -238,7 +231,7 @@ function discoverContactPageUrls(html: string, baseUrl: string) {
 }
 
 async function fetchContactPage(url: URL, redirectsRemaining = 2) {
-  const response = await fetch(url, {
+  const response = await safeFetch(url, {
     redirect: "manual",
     signal: AbortSignal.timeout(6_000),
     headers: { "User-Agent": "HustleWebsiteAudit/1.0" },
@@ -264,7 +257,7 @@ async function fetchContactPage(url: URL, redirectsRemaining = 2) {
     !contentType.includes("text/html")
   )
     return null;
-  return (await response.text()).slice(0, CONTACT_PAGE_BYTES);
+  return readCapped(response, CONTACT_PAGE_BYTES);
 }
 
 export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
@@ -302,9 +295,9 @@ export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
       "Move the site to HTTPS and redirect HTTP traffic.",
     );
   const started = Date.now();
-  let response: Response;
+  let response: SafeResponse;
   try {
-    response = await fetch(url, {
+    response = await safeFetch(url, {
       redirect: "manual",
       signal: AbortSignal.timeout(8_000),
       headers: { "User-Agent": "HustleWebsiteAudit/1.0" },
@@ -333,10 +326,10 @@ export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
   const responseMs = Date.now() - started;
   if (response.status >= 300 && response.status < 400) {
     const location = response.headers.get("location");
-    if (!location) throw new Error("Redirect without a destination");
+    if (!location) throw new UserError("The website redirects without a destination");
     const redirected = new URL(location, url);
     await assertPublicUrl(redirected.href);
-    response = await fetch(redirected, {
+    response = await safeFetch(redirected, {
       redirect: "error",
       signal: AbortSignal.timeout(8_000),
       headers: { "User-Agent": "HustleWebsiteAudit/1.0" },
@@ -344,8 +337,8 @@ export async function auditWebsite(raw?: string | null): Promise<WebsiteAudit> {
   }
   const declaredLength = Number(response.headers.get("content-length") || 0);
   if (declaredLength > 2_000_000)
-    throw new Error("Website response exceeds the 2 MB audit limit");
-  const html = (await response.text()).slice(0, 2_000_000);
+    throw new UserError("Website response exceeds the 2 MB audit limit");
+  const html = await readCapped(response, 2_000_000);
   const finalUrl = response.url || url.href;
   const contacts = new Map(
     extractPublicContacts(html, finalUrl).map((item) => [

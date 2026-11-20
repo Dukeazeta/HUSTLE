@@ -15,7 +15,7 @@ import {
   pitchVariants,
   suppressions,
 } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, requireUser, unauthorized } from "@/lib/api";
 import type { AuditFinding } from "@/lib/audit";
 import { OUTREACH_CHANNELS } from "@/lib/constants";
 import { withDatabaseRetry } from "@/lib/db-retry";
@@ -44,7 +44,7 @@ export async function POST(
 
   try {
     const businessId = (await params).id;
-    const input = bodySchema.parse(await request.json());
+    const input = await parseBody(request, bodySchema);
     const business = await withDatabaseRetry(() =>
       db.query.businesses.findFirst({ where: eq(businesses.id, businessId) }),
     );

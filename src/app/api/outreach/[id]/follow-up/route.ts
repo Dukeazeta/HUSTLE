@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import { outreachDrafts } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, requireUser, unauthorized } from "@/lib/api";
 import { buildFollowUp } from "@/lib/workflow";
 
 const editSchema = z.object({
@@ -18,7 +18,7 @@ export async function POST(
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const draftId = (await params).id;
-    const input = editSchema.parse(await request.json().catch(() => ({})));
+    const input = await parseBody(request, editSchema, {});
     const draft = await db.query.outreachDrafts.findFirst({
       where: eq(outreachDrafts.id, draftId),
     });

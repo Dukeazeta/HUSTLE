@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { countryName, googleRegionCode } from "./markets";
+import { UserError } from "./errors";
 
 const placeSchema = z.object({
   id: z.string(),
@@ -71,7 +72,13 @@ export async function searchPlaces(input: {
       signal: AbortSignal.timeout(12_000),
     },
   );
-  if (!response.ok) throw new Error(`Places returned ${response.status}`);
+  if (!response.ok) {
+    console.error(`Google Places search returned HTTP ${response.status}`);
+    throw new UserError(
+      "Google Places search is unavailable right now. Try again shortly.",
+      502,
+    );
+  }
   return responseSchema
     .parse(await response.json())
     .places.slice(0, input.limit);
@@ -92,7 +99,12 @@ export async function getPlaceDetails(placeId: string) {
       signal: AbortSignal.timeout(10_000),
     },
   );
-  if (!response.ok)
-    throw new Error(`Place Details returned ${response.status}`);
+  if (!response.ok) {
+    console.error(`Google Place Details returned HTTP ${response.status}`);
+    throw new UserError(
+      "Google Places details are unavailable right now. Try again shortly.",
+      502,
+    );
+  }
   return placeDetailsSchema.parse(await response.json());
 }

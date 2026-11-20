@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import { outreachDrafts } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, requireUser, unauthorized } from "@/lib/api";
 
 const schema = z.object({
   subject: z.string().max(200).nullable().optional(),
@@ -18,7 +18,7 @@ export async function PATCH(
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const draftId = (await params).id;
-    const input = schema.parse(await request.json());
+    const input = await parseBody(request, schema);
     if (!Object.keys(input).length)
       return NextResponse.json(
         { error: "No draft changes were provided" },

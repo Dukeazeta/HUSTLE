@@ -9,7 +9,7 @@ import {
   outreachDrafts,
   payments,
 } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, requireUser, unauthorized } from "@/lib/api";
 import { id } from "@/lib/ids";
 import { isCurrencyCode, normalizeCurrencyCode } from "@/lib/markets";
 
@@ -30,7 +30,7 @@ export async function POST(
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const opportunityId = (await params).id;
-    const input = inputSchema.parse(await request.json());
+    const input = await parseBody(request, inputSchema);
     const opportunity = await db.query.opportunities.findFirst({
       where: eq(opportunities.id, opportunityId),
     });

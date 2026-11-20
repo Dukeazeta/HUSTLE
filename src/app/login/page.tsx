@@ -7,9 +7,11 @@ import {
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
+import { isDemoMode } from "@/lib/demo";
 import styles from "./page.module.css";
 
 export default async function Login() {
+  if (isDemoMode()) redirect("/");
   const session = await auth();
   if (session?.user?.email) redirect("/");
 

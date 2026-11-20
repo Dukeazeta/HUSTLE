@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { braveCountryCode, countryName } from "./markets";
+import { UserError } from "./errors";
 
 export const BUSINESS_LINK_TYPES = [
   "website",
@@ -218,7 +219,13 @@ export async function searchPublicBusinessPresence(input: {
   });
   if (!response.ok) {
     const responseBody = await response.text();
-    throw new Error(braveSearchErrorMessage(response.status, responseBody));
+    console.error(braveSearchErrorMessage(response.status, responseBody));
+    throw new UserError(
+      response.status === 429
+        ? "Public-web search is busy. Try again in a few minutes."
+        : "Public-web search is unavailable right now. Try again later.",
+      response.status === 429 ? 503 : 502,
+    );
   }
   const parsed = searchResponseSchema.parse(await response.json());
   const sourceUrl = `https://search.brave.com/search?q=${encodeURIComponent(query)}`;

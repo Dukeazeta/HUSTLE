@@ -3,6 +3,7 @@ import type {
   OutreachChannel,
   PitchVariantLabel,
 } from "./constants";
+import { UserError } from "./errors";
 
 export type PitchEvidence = Pick<
   AuditFinding,
@@ -139,7 +140,7 @@ export function buildFallbackPitchParts(
   channel: OutreachChannel,
 ): PitchVariantParts[] {
   const primary = evidence[0];
-  if (!primary) throw new Error("A pitch requires verified audit evidence");
+  if (!primary) throw new UserError("A pitch requires verified audit evidence");
   const support = evidence[1];
   const primaryObservation = observationFor(primary);
   const supportObservation = support

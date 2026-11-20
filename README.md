@@ -36,7 +36,7 @@ Fill `.env.local` with:
 - Gemini API key
 - strong `AUTH_SECRET` and `CRON_SECRET`
 
-For a credential-free UI preview, set `DEMO_MODE=true`. Never enable demo mode in production.
+For a credential-free UI preview, set `DEMO_MODE=true`. Demo mode skips sign-in, shows read-only sample data and rejects every change. It is ignored on Vercel production (`VERCEL_ENV=production`), so sign-in stays required there.
 
 ## Database and deployment
 

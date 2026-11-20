@@ -3,7 +3,7 @@ import { desc } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import { campaigns } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, requireUser, unauthorized } from "@/lib/api";
 import { CATEGORIES } from "@/lib/constants";
 import { id } from "@/lib/ids";
 import {
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
   if (!(await requireUser())) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
-    const data = inputSchema.parse(await request.json());
+    const data = await parseBody(request, inputSchema);
     const record = {
       id: id("cmp"),
       ...data,

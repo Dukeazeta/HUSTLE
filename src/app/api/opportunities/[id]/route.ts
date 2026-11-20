@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import { activities, businesses, opportunities } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, requireUser, unauthorized } from "@/lib/api";
 import { id } from "@/lib/ids";
 import { isCurrencyCode, normalizeCurrencyCode } from "@/lib/markets";
 
@@ -25,7 +25,7 @@ export async function PATCH(
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const opportunityId = (await params).id;
-    const input = schema.parse(await request.json());
+    const input = await parseBody(request, schema);
     const opportunity = await db.query.opportunities.findFirst({
       where: eq(opportunities.id, opportunityId),
     });

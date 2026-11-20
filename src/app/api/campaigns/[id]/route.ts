@@ -3,7 +3,7 @@ import { count, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import { businesses, campaigns } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, requireUser, unauthorized } from "@/lib/api";
 import { OUTREACH_CHANNELS } from "@/lib/constants";
 import {
   isCurrencyCode,
@@ -39,7 +39,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (!isDatabaseConfigured()) return notConfigured("Turso");
 
   try {
-    const input = updateSchema.parse(await request.json());
+    const input = await parseBody(request, updateSchema);
     const campaignId = (await params).id;
     const campaign = await db.query.campaigns.findFirst({
       columns: { id: true, status: true },

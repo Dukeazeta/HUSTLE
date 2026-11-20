@@ -1,4 +1,5 @@
 import type { AuditFinding } from "./audit";
+import { UserError } from "./errors";
 
 export function buildPitch(input: {
   businessName: string;
@@ -10,7 +11,7 @@ export function buildPitch(input: {
 }) {
   const finding = input.findings[0];
   if (!finding)
-    throw new Error("A pitch requires at least one verified finding");
+    throw new UserError("A pitch requires at least one verified finding");
   const issue = finding.evidence.replace(/\.$/, "").toLowerCase();
   const observation =
     input.pitchAngle?.trim() ||
