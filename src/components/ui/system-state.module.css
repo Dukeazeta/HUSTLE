@@ -20,7 +20,7 @@
   place-items: center;
   margin-bottom: 24px;
   border-radius: 50%;
-  background: #0052ff;
+  background: #1f2125;
   color: #ffffff;
 }
 
@@ -34,9 +34,9 @@
   display: inline-flex;
   align-items: center;
   padding: 0 12px;
-  border-radius: 999px;
-  background: #eef0f3;
-  color: #5b616e;
+  border-radius: var(--radius-pill);
+  background: #eeeff1;
+  color: #505967;
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -45,7 +45,7 @@
 .state h1 {
   max-width: 12ch;
   margin: 18px 0 0;
-  color: #0a0b0d;
+  color: #1c1d1f;
   font-size: clamp(2.5rem, 8vw, 4rem);
   font-weight: 400;
   letter-spacing: -0.055em;
@@ -55,7 +55,7 @@
 .state p {
   max-width: 50ch;
   margin: 20px 0 0;
-  color: #5b616e;
+  color: #505967;
   font-size: 1rem;
   line-height: 1.65;
 }
@@ -75,10 +75,10 @@
   align-items: center;
   justify-content: center;
   padding: 0 20px;
-  border: 1px solid #dee1e6;
-  border-radius: 999px;
+  border: 1px solid #e4e7ec;
+  border-radius: var(--radius-pill);
   background: #ffffff;
-  color: #0a0b0d;
+  color: #1c1d1f;
   font: inherit;
   font-size: 0.875rem;
   font-weight: 600;
@@ -93,21 +93,21 @@
 
 .actions button:first-child,
 .actions a:first-child {
-  border-color: #0052ff;
-  background: #0052ff;
+  border-color: #1f2125;
+  background: #1f2125;
   color: #ffffff;
 }
 
 .actions a:hover,
 .actions button:hover {
-  border-color: #a8b8cc;
-  background: #f7f7f7;
+  border-color: #a5a9b0;
+  background: #f3f4f5;
 }
 
 .actions button:first-child:hover,
 .actions a:first-child:hover {
-  border-color: #003ecc;
-  background: #003ecc;
+  border-color: #33363c;
+  background: #33363c;
   color: #ffffff;
 }
 

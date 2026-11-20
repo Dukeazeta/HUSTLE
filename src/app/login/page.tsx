@@ -8,24 +8,26 @@ import {
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
 import { isDemoMode } from "@/lib/demo";
+import Link from "next/link";
+import { Mark } from "@/components/marketing/wordmark";
 import styles from "./page.module.css";
 
 export default async function Login() {
-  if (isDemoMode()) redirect("/");
+  if (isDemoMode()) redirect("/dashboard");
   const session = await auth();
-  if (session?.user?.email) redirect("/");
+  if (session?.user?.email) redirect("/dashboard");
 
   return (
     <main className={styles.page}>
       <section className={styles.editorial}>
-        <strong className={styles.wordmark}>HUSTLE</strong>
+        <Link href="/" className={styles.wordmark} aria-label="HUSTLE home">
+          <Mark />
+          HUSTLE
+        </Link>
         <div className={styles.editorialCopy}>
-          <span>Private sales workspace</span>
-          <h1>Evidence first. Every message human.</h1>
-          <p>
-            Discover businesses worldwide, verify the opportunity and keep
-            outreach completely under your control.
-          </p>
+          <h1>
+            Evidence first. <span>Every message human.</span>
+          </h1>
         </div>
         <div className={styles.productCard} aria-label="HUSTLE workflow">
           <WorkflowRow icon={<ScanSearch />} label="Review public evidence" />
@@ -39,12 +41,12 @@ export default async function Login() {
           <span className={styles.lock}>
             <LockKeyhole aria-hidden="true" />
           </span>
-          <h2 id="login-title">Welcome back</h2>
-          <p>Sign in with any Google account to open your workspace.</p>
+          <h2 id="login-title">Sign in to HUSTLE</h2>
+          <p>Use any Google account. New accounts get a private workspace.</p>
           <form
             action={async () => {
               "use server";
-              await signIn("google", { redirectTo: "/" });
+              await signIn("google", { redirectTo: "/dashboard" });
             }}
           >
             <button>

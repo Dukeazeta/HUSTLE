@@ -8,13 +8,12 @@ export default function ErrorPage({ reset }: { reset: () => void }) {
   return (
     <SystemState
       icon={<AlertTriangle aria-hidden="true" />}
-      eyebrow="Request interrupted"
       title="Something went wrong"
       body="The workspace could not complete that request. Your saved data has not been changed."
       actions={
         <>
           <button onClick={reset}>Try again</button>
-          <Link href="/">Return to dashboard</Link>
+          <Link href="/dashboard">Return to dashboard</Link>
         </>
       }
     />

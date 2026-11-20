@@ -60,7 +60,6 @@ export default async function FollowUpsPage() {
   return (
     <AppShell active="followups">
       <PageHeader
-        eyebrow="Manual reminders"
         title="Follow-ups"
         description="Review every message yourself. HUSTLE never sends outreach automatically."
         actions={
@@ -76,7 +75,6 @@ export default async function FollowUpsPage() {
         <section aria-labelledby="due-heading">
           <div className={styles.sectionHeader}>
             <div>
-              <span>Needs attention</span>
               <h2 id="due-heading">Due now</h2>
             </div>
             <small>{due.length} reminders</small>
@@ -91,7 +89,6 @@ export default async function FollowUpsPage() {
         <section aria-labelledby="upcoming-heading">
           <div className={styles.sectionHeader}>
             <div>
-              <span>Scheduled</span>
               <h2 id="upcoming-heading">Upcoming</h2>
             </div>
             <small>{upcoming.length} reminders</small>

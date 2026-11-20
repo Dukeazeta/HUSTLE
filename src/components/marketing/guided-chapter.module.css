@@ -1,0 +1,175 @@
+.chapter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+  border-top: 1px solid var(--rule);
+}
+
+.rail {
+  border-right: 1px solid var(--rule);
+}
+
+.rail ol {
+  position: sticky;
+  top: 69px;
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 112px 24px 24px var(--inset);
+  list-style: none;
+}
+
+.railLink {
+  position: relative;
+  display: block;
+  padding: 6px 0 6px 14px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 22px;
+  text-decoration: none;
+  transition: color 0.3s var(--ease-control);
+}
+
+.railLink::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background-color 0.3s var(--ease-control);
+}
+
+.railLink:hover {
+  color: var(--ink);
+}
+
+.railLink[aria-current="step"] {
+  color: var(--ink);
+}
+
+.railLink[aria-current="step"]::before {
+  background: var(--blue);
+}
+
+.stages {
+  min-width: 0;
+}
+
+.benefit {
+  padding-top: 112px;
+  scroll-margin-top: 60px;
+}
+
+.benefit + .benefit {
+  border-top: 1px solid var(--rule);
+}
+
+.lead {
+  max-width: 720px;
+  margin: 0;
+  padding: 0 var(--inset) 40px;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.lead span {
+  color: var(--support);
+}
+
+.stage {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  min-height: 440px;
+  padding: 56px var(--inset);
+  border-top: 1px solid var(--rule);
+  background: var(--stage);
+}
+
+.notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--rule);
+}
+
+.notes > div {
+  padding: 24px var(--inset) 28px;
+}
+
+.notes > div + div {
+  border-left: 1px solid var(--rule);
+}
+
+.notes strong {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.notes p {
+  margin: 4px 0 0;
+  color: var(--support);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+@media (max-width: 991px) {
+  .chapter {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rail {
+    position: sticky;
+    top: 69px;
+    z-index: 5;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+    background: rgb(255 255 255 / 94%);
+    backdrop-filter: blur(10px);
+  }
+
+  .rail ol {
+    position: static;
+    display: flex;
+    gap: 20px;
+    overflow-x: auto;
+    padding: 0 var(--inset);
+    scrollbar-width: none;
+  }
+
+  .railLink {
+    padding: 12px 0;
+    white-space: nowrap;
+  }
+
+  .railLink::before {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: auto;
+    height: 2px;
+  }
+
+  .benefit {
+    padding-top: 64px;
+    scroll-margin-top: 120px;
+  }
+
+  .stage {
+    min-height: 0;
+    padding: 32px 16px;
+  }
+
+  .notes {
+    display: none;
+  }
+
+  .lead {
+    font-size: 20px;
+    padding-bottom: 28px;
+  }
+}

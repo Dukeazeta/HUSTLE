@@ -255,9 +255,8 @@ export function CampaignCard({
         open={showSettings}
         onClose={closeSettings}
         variant="drawer"
-        eyebrow={`${campaign.city}, ${countryName(campaign.country)}`}
         title={campaign.name}
-        description="Update future opportunity pricing and keep a record of your market review."
+        description={`${campaign.city}, ${countryName(campaign.country)}. Update future opportunity pricing and keep a record of your market review.`}
       >
         <div className={styles.drawerContent}>
           <section className={styles.settingsSection}>

@@ -6,12 +6,11 @@ export default function NotFound() {
   return (
     <SystemState
       icon={<SearchX aria-hidden="true" />}
-      eyebrow="Not found"
       title="This page isn’t here"
       body="The link may be old, or the item may have been removed from the workspace."
       actions={
         <>
-          <Link href="/">Return to dashboard</Link>
+          <Link href="/dashboard">Return to dashboard</Link>
           <Link href="/leads">Browse leads</Link>
         </>
       }

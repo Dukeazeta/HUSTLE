@@ -41,7 +41,6 @@ export default async function LeadsPage() {
   return (
     <AppShell active="leads">
       <PageHeader
-        eyebrow="Pipeline"
         title="Leads"
         description="Find the right business quickly, then continue its next workflow step."
         actions={

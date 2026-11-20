@@ -141,7 +141,6 @@ export default async function LeadPage({
   return (
     <AppShell active="leads">
       <PageHeader
-        eyebrow="Lead workspace"
         title={lead.name}
         description="Review the evidence, make the next decision and keep every action manual."
         actions={

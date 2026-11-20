@@ -29,7 +29,6 @@ export default async function CampaignsPage() {
   return (
     <AppShell active="campaigns">
       <PageHeader
-        eyebrow="Discovery"
         title="Campaigns"
         description="Run one focused city search at a time, anywhere in the world."
         actions={<CampaignCreator configured={configured} />}

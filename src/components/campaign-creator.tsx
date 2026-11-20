@@ -82,7 +82,6 @@ export function CampaignCreator({ configured }: { configured: boolean }) {
       <Dialog
         open={open}
         onClose={close}
-        eyebrow="New search"
         title="Create a campaign"
         description="Choose one market and business category to begin finding leads."
         footer={

@@ -1,21 +1,21 @@
 .shell {
-  --blue: #0052ff;
-  --blue-active: #003ecc;
-  --ink: #0a0b0d;
-  --body: #5b616e;
-  --muted: #7c828a;
-  --hairline: #dee1e6;
-  --hairline-soft: #eef0f3;
+  --blue: #1f2125;
+  --blue-active: #33363c;
+  --ink: #1c1d1f;
+  --body: #505967;
+  --muted: #707781;
+  --hairline: #e4e7ec;
+  --hairline-soft: #eeeff1;
   --canvas: #ffffff;
-  --surface: #eef0f3;
-  --danger: #cf202f;
+  --surface: #eeeff1;
+  --danger: #c4282f;
 
   container-type: inline-size;
   overflow: hidden;
   color: var(--ink);
   background: var(--canvas);
   border: 1px solid var(--hairline);
-  border-radius: 24px;
+  border-radius: var(--radius-xl);
   font-family: var(--font-inter), Inter, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
 }
@@ -48,7 +48,7 @@
   padding: 0 18px;
   background: var(--surface);
   border: 1px solid transparent;
-  border-radius: 100px;
+  border-radius: var(--radius-pill);
   transition:
     background-color 150ms ease,
     border-color 150ms ease;
@@ -92,7 +92,7 @@
   color: var(--ink);
   background-color: var(--surface);
   border: 1px solid transparent;
-  border-radius: 100px;
+  border-radius: var(--radius-pill);
   font-size: 14px;
   font-weight: 400;
 }
@@ -118,7 +118,7 @@
   color: var(--ink);
   background: var(--surface);
   border: 0;
-  border-radius: 100px;
+  border-radius: var(--radius-pill);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -149,14 +149,15 @@
 
 .summary strong {
   color: var(--ink);
-  font-family: var(--font-geist-mono), "JetBrains Mono", monospace;
+  font-family: var(--font-number);
+  font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
 
 .notice {
   padding: 12px 24px;
   color: var(--ink);
-  background: #f7f7f7;
+  background: #f3f4f5;
   border-bottom: 1px solid var(--hairline-soft);
   font-size: 14px;
 }
@@ -210,7 +211,7 @@
 }
 
 .leadRow:hover {
-  background: #f7f7f7;
+  background: #f3f4f5;
 }
 
 .leadRow[data-suppressed="true"] {
@@ -236,7 +237,7 @@
   flex: 0 0 auto;
   color: var(--ink);
   background: var(--surface);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 600;
 }
@@ -288,7 +289,7 @@
   overflow: hidden;
   color: var(--ink);
   background: var(--surface);
-  border-radius: 100px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.5;
@@ -340,7 +341,8 @@
   align-items: baseline;
   gap: 3px;
   color: var(--muted);
-  font-family: var(--font-geist-mono), "JetBrains Mono", monospace;
+  font-family: var(--font-number);
+  font-variant-numeric: tabular-nums;
 }
 
 .score strong {
@@ -369,7 +371,7 @@
   justify-content: center;
   gap: 7px;
   border: 0;
-  border-radius: 100px;
+  border-radius: var(--radius-pill);
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
@@ -445,7 +447,7 @@
   place-items: center;
   color: var(--ink);
   background: var(--surface);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
 }
 
 .emptyIcon svg {

@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { isDemoMode } from "@/lib/demo";
+import { isPublicPath } from "@/lib/public-paths";
 
 const authProxy = auth((request) => {
   if (request.auth?.user?.email) return NextResponse.next();
@@ -10,11 +11,15 @@ const authProxy = auth((request) => {
 });
 
 export function proxy(...args: Parameters<typeof authProxy>) {
-  // Demo mode skips the session lookup entirely; it never runs in production.
-  if (isDemoMode()) return NextResponse.next();
+  const request = args[0] as NextRequest;
+  // Public pages and demo mode skip the session lookup entirely.
+  // Demo mode never runs in production.
+  if (isPublicPath(request.nextUrl.pathname) || isDemoMode()) return NextResponse.next();
   return authProxy(...args);
 }
 
 export const config = {
-  matcher: ["/((?!api/auth|login|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!api/auth|login|_next/static|_next/image|favicon.ico|icon.svg|robots.txt|sitemap.xml|opengraph-image).*)",
+  ],
 };

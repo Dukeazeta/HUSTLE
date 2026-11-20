@@ -1,20 +1,20 @@
 .queue {
-  --blue: #0052ff;
-  --blue-active: #003ecc;
-  --ink: #0a0b0d;
-  --body: #5b616e;
-  --muted: #7c828a;
-  --hairline: #dee1e6;
-  --hairline-soft: #eef0f3;
+  --blue: #1f2125;
+  --blue-active: #33363c;
+  --ink: #1c1d1f;
+  --body: #505967;
+  --muted: #707781;
+  --hairline: #e4e7ec;
+  --hairline-soft: #eeeff1;
   --canvas: #ffffff;
-  --surface: #eef0f3;
+  --surface: #eeeff1;
 
   container-type: inline-size;
   overflow: hidden;
   color: var(--ink);
   background: var(--canvas);
   border: 1px solid var(--hairline);
-  border-radius: 24px;
+  border-radius: var(--radius-xl);
   font-family: var(--font-inter), Inter, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
 }
@@ -34,7 +34,7 @@
 }
 
 .row:hover {
-  background: #f7f7f7;
+  background: #f3f4f5;
 }
 
 .iconPlate {
@@ -45,7 +45,7 @@
   flex: 0 0 auto;
   color: var(--ink);
   background: var(--surface);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
 }
 
 .iconPlate svg {
@@ -79,7 +79,7 @@
   padding: 4px 10px;
   color: var(--ink);
   background: var(--surface);
-  border-radius: 100px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.5;
@@ -109,7 +109,8 @@
 
 .due time {
   color: var(--ink);
-  font-family: var(--font-geist-mono), "JetBrains Mono", monospace;
+  font-family: var(--font-number);
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
@@ -125,7 +126,7 @@
   padding: 0 18px;
   color: #ffffff;
   background: var(--blue);
-  border-radius: 100px;
+  border-radius: var(--radius-pill);
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
