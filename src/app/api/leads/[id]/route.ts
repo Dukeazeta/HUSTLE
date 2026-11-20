@@ -9,7 +9,15 @@ import {
   opportunities,
   outreachDrafts,
 } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import {
+  apiError,
+  notConfigured,
+  parseBody,
+  unauthorized,
+  UserError,
+} from "@/lib/api";
+import { getOwnedBusiness } from "@/lib/ownership";
+import { requireWorkspace } from "@/lib/workspace";
 import { PIPELINE_STAGES } from "@/lib/constants";
 import { id, normalizePhone } from "@/lib/ids";
 import { canTransition, REMINDER_CANCEL_STAGES } from "@/lib/workflow";
@@ -42,11 +50,12 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const businessId = (await params).id;
-    const input = schema.parse(await request.json());
+    const input = await parseBody(request, schema);
     if (
       (input.outreachBasis === "consent" ||
         input.outreachBasis === "solicited_request") &&
@@ -56,9 +65,7 @@ export async function PATCH(
         { error: "Document the consent or solicited request" },
         { status: 400 },
       );
-    const business = await db.query.businesses.findFirst({
-      where: eq(businesses.id, businessId),
-    });
+    const business = await getOwnedBusiness(workspace.workspaceId, businessId);
     if (!business)
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     if (
@@ -130,7 +137,7 @@ export async function PATCH(
           input.contact.channel === "email"
             ? input.contact.value.toLowerCase().trim()
             : normalizePhone(input.contact.value);
-        if (!normalizedValue) throw new Error("Contact value is invalid");
+        if (!normalizedValue) throw new UserError("Contact value is invalid");
         if (input.contact.isPrimary)
           await tx
             .update(contacts)
@@ -141,7 +148,17 @@ export async function PATCH(
                 eq(contacts.channel, input.contact.channel),
               ),
             );
-        const contactId = input.contact.id ?? id("con");
+        // A browser-supplied id is only reused when it belongs to this lead.
+        const existingContact = input.contact.id
+          ? await tx.query.contacts.findFirst({
+              columns: { id: true },
+              where: and(
+                eq(contacts.id, input.contact.id),
+                eq(contacts.businessId, businessId),
+              ),
+            })
+          : undefined;
+        const contactId = existingContact?.id ?? id("con");
         await tx
           .insert(contacts)
           .values({

@@ -22,7 +22,7 @@
   place-items: center;
   color: var(--primary);
   background: var(--surface-strong);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   font-family: var(--font-number);
   font-size: 13px;
   font-weight: 600;

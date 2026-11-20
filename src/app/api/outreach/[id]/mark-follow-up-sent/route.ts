@@ -9,7 +9,9 @@ import {
   contacts,
   outreachDrafts,
 } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, unauthorized } from "@/lib/api";
+import { getOwnedDraft } from "@/lib/ownership";
+import { requireWorkspace } from "@/lib/workspace";
 import { id } from "@/lib/ids";
 import { outreachBlockReason } from "@/lib/outreach-compliance";
 
@@ -17,13 +19,12 @@ export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const draftId = (await params).id;
-    const draft = await db.query.outreachDrafts.findFirst({
-      where: eq(outreachDrafts.id, draftId),
-    });
+    const draft = await getOwnedDraft(workspace.workspaceId, draftId);
     if (!draft)
       return NextResponse.json({ error: "Draft not found" }, { status: 404 });
     if (draft.followUpSentAt)

@@ -1,97 +1,106 @@
+/* Signed-in app frame: a quiet left sidebar beside the work area (DESIGN.md, Operate). */
 .shell {
-  --brand-blue: #0052ff;
-  --brand-blue-active: #003ecc;
-  --ink: #0a0b0d;
-  --body: #5b616e;
-  --hairline: #dee1e6;
-  --surface-strong: #eef0f3;
+  --sidebar-width: 240px;
   min-height: 100dvh;
-  background: #fff;
+  background: var(--canvas);
   color: var(--ink);
-  font-family:
-    var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
 }
 
-.topNavigation {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  height: 64px;
-  border-bottom: 1px solid var(--hairline);
-  background: rgb(255 255 255 / 96%);
-  backdrop-filter: blur(14px);
-}
-
-.navigationCanvas {
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 40;
   display: flex;
-  width: min(100% - 48px, 1200px);
-  height: 100%;
-  margin-inline: auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 32px;
+  flex-direction: column;
+  width: var(--sidebar-width);
+  padding: 16px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-subtle);
 }
 
 .brand {
   display: inline-flex;
-  min-height: 44px;
-  flex: 0 0 auto;
   align-items: center;
-  gap: 10px;
-  border-radius: 100px;
-  color: var(--brand-blue);
-  font-size: 0.95rem;
+  gap: 8px;
+  height: 36px;
+  padding: 0 8px;
+  color: var(--ink);
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: 0.035em;
+  letter-spacing: -0.01em;
   text-decoration: none;
 }
 
-.brandGlyph {
+.brand svg {
+  width: 20px;
+  height: 20px;
+}
+
+.navigation {
   display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border-radius: 9999px;
-  background: var(--brand-blue);
-  color: #fff;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0;
+  gap: 2px;
+  margin-top: 20px;
 }
 
-.desktopNavigation {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-}
-
-.desktopActions {
+.navigationLink {
   display: flex;
   align-items: center;
   gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
-.logoutForm {
-  margin-left: 6px;
-  padding-left: 16px;
-  border-left: 1px solid var(--hairline);
+.navigationLink svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  stroke-width: 1.6;
+}
+
+.navigationLink:hover {
+  background: var(--surface-muted);
+  color: var(--ink);
+}
+
+.navigationLink.active {
+  border-color: var(--border);
+  background: var(--canvas);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(28 40 64 / 6%);
+}
+
+.navigationLink.active svg {
+  color: var(--accent);
+}
+
+.sidebarFoot {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .logoutButton {
-  min-height: 44px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 16px;
-  color: var(--body);
-  background: transparent;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 100px;
-  font: inherit;
-  font-size: 0.875rem;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition:
@@ -100,124 +109,94 @@
 }
 
 .logoutButton:hover {
+  background: var(--surface-muted);
   color: var(--ink);
-  background: #f7f7f7;
 }
 
 .logoutButton svg {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.6;
 }
 
-.navigationLink {
-  display: inline-flex;
-  min-height: 44px;
+.demoLabel {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 100px;
-  padding: 0 16px;
-  color: var(--ink);
-  font-size: 0.875rem;
-  font-weight: 500;
-  line-height: 1.4;
-  text-decoration: none;
-  transition:
-    background-color 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
+  height: 34px;
+  padding: 0 10px;
+  color: var(--text-subtle);
+  font-size: 13px;
 }
 
-.navigationLink:hover {
-  background: #f7f7f7;
-}
-
-.navigationLink:active {
-  transform: scale(0.98);
-}
-
-.navigationLink.active {
-  background: var(--surface-strong);
-  color: var(--brand-blue);
-}
-
-.brand:focus-visible,
-.navigationLink:focus-visible,
-.menuButton:focus-visible,
-.logoutButton:focus-visible {
-  outline: 2px solid var(--brand-blue);
-  outline-offset: 3px;
-}
-
-.mobileMenu {
+.topBar {
   display: none;
 }
 
 .main {
   min-width: 0;
+  margin-left: var(--sidebar-width);
 }
 
 .content {
-  width: min(100% - 48px, 1200px);
-  min-height: calc(100dvh - 64px);
-  margin-inline: auto;
-  padding-block: clamp(40px, 5vw, 72px) 72px;
+  min-width: 0;
+  max-width: 1280px;
+  padding: 32px 40px 64px;
 }
 
-@media (max-width: 900px) {
-  .navigationCanvas,
+@media (max-width: 991px) {
+  .sidebar {
+    display: none;
+  }
+
+  .main {
+    margin-left: 0;
+  }
+
   .content {
-    width: min(100% - 32px, 1200px);
+    padding: 20px 16px 48px;
   }
 
-  .desktopNavigation {
-    display: none;
+  .topBar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    background: rgb(255 255 255 / 94%);
+    backdrop-filter: blur(12px);
   }
 
-  .desktopActions {
-    display: none;
-  }
-
-  .mobileMenu {
-    display: block;
+  .brand {
+    padding: 0;
   }
 
   .menuButton {
     display: grid;
-    width: 44px;
-    height: 44px;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    background: var(--canvas);
     cursor: pointer;
     list-style: none;
-    place-items: center;
-    border-radius: 9999px;
-    background: var(--surface-strong);
-    color: var(--ink);
-    transition:
-      background-color 160ms ease,
-      transform 160ms ease;
   }
 
   .menuButton::-webkit-details-marker {
     display: none;
   }
 
-  .menuButton:hover {
-    background: #e3e6ea;
-  }
-
-  .menuButton:active {
-    transform: scale(0.96);
-  }
-
   .menuButton svg {
-    width: 20px;
-    height: 20px;
-    stroke-width: 1.8;
+    width: 18px;
+    height: 18px;
+    stroke-width: 1.6;
   }
 
-  .closeIcon {
-    display: none;
-  }
-
+  .closeIcon,
   .mobileMenu[open] .openIcon {
     display: none;
   }
@@ -227,78 +206,26 @@
   }
 
   .mobileSheet {
-    position: fixed;
-    inset: 64px 0 auto;
-    border-bottom: 1px solid var(--hairline);
-    background: #fff;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 4%);
-    animation: sheet-in 180ms ease both;
-  }
-
-  .mobileSheetCanvas {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
     display: grid;
-    width: min(100% - 32px, 1200px);
-    margin-inline: auto;
-    gap: 4px;
-    padding-block: 16px 20px;
+    gap: 2px;
+    padding: 8px 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--canvas);
+    box-shadow: 0 16px 28px rgb(11 13 24 / 6%);
   }
 
   .mobileSheet .navigationLink {
-    width: 100%;
-    min-height: 48px;
-    justify-content: flex-start;
-    padding-inline: 18px;
-    font-size: 1rem;
+    height: 44px;
+    font-size: 15px;
   }
 
-  .workspaceLabel {
-    margin: 12px 18px 0;
-    padding-top: 16px;
-    border-top: 1px solid var(--hairline);
-    color: var(--body);
-    font-size: 0.8125rem;
-    line-height: 1.5;
-  }
-
-  .mobileLogout {
+  .mobileFoot {
     margin-top: 8px;
-    padding-top: 12px;
-    border-top: 1px solid var(--hairline);
-  }
-
-  .mobileLogout .logoutButton {
-    width: 100%;
-    min-height: 48px;
-    justify-content: flex-start;
-    padding-inline: 18px;
-    color: var(--ink);
-    font-size: 1rem;
-  }
-
-  .content {
-    padding-block: 32px 56px;
-  }
-}
-
-@keyframes sheet-in {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .navigationLink,
-  .menuButton {
-    transition: none;
-  }
-
-  .mobileSheet {
-    animation: none;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
   }
 }

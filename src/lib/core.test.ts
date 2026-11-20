@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "@libsql/client";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import {
   auditWebsite,
   calculateOpportunityScore,
@@ -17,7 +17,9 @@ import {
   extractPublicBusinessLinks,
 } from "./web-enrichment";
 import { withDatabaseRetry } from "./db-retry";
-import { buildPitchPrompt } from "./gemini";
+import { createGuardedLookup, isPrivateIp, readCapped, safeFetch } from "./safe-fetch";
+import { utcDayStart } from "./usage";
+import { buildPitchPrompt, geminiModel } from "./gemini";
 import { outreachBlockReason } from "./outreach-compliance";
 import {
   braveCountryCode,
@@ -347,6 +349,20 @@ describe("pitch generation upgrade", () => {
     ).toThrow();
   });
 
+  describe("Gemini model selection", () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("defaults to Gemini 3.8 Flash", () => {
+      vi.stubEnv("GEMINI_MODEL", "");
+      expect(geminiModel()).toBe("gemini-3.8-flash");
+    });
+
+    it("lets GEMINI_MODEL override the default", () => {
+      vi.stubEnv("GEMINI_MODEL", "gemini-3.6-flash");
+      expect(geminiModel()).toBe("gemini-3.6-flash");
+    });
+  });
+
   it("removes contact data from Gemini prompts", () => {
     const prompt = buildPitchPrompt({
       category: "Acme Salon +2348012345678",
@@ -550,6 +566,151 @@ describe("worldwide market migration", () => {
         booking_catalogue_price: 2200,
       });
       expect(business.rows[0]).toMatchObject({ country: "GB" });
+    } finally {
+      client.close();
+    }
+  });
+});
+
+describe("private address protection", () => {
+  it("blocks private, reserved and disguised internal addresses", () => {
+    for (const address of [
+      "127.0.0.1",
+      "10.1.2.3",
+      "172.20.0.1",
+      "192.168.1.1",
+      "169.254.169.254",
+      "100.64.0.1",
+      "198.18.0.1",
+      "0.0.0.0",
+      "224.0.0.1",
+      "255.255.255.255",
+      "::",
+      "::1",
+      "fd12::1",
+      "fe80::1",
+      "febf::1",
+      "fec0::1",
+      "ff02::1",
+      "::ffff:127.0.0.1",
+      "::ffff:7f00:1",
+      "64:ff9b::7f00:1",
+      "[::1]",
+      "not-an-ip",
+    ])
+      expect(isPrivateIp(address), address).toBe(true);
+  });
+
+  it("allows ordinary public addresses", () => {
+    for (const address of ["8.8.8.8", "104.16.132.229", "2606:4700::6810:84e5", "2001:4860:4860::8888"])
+      expect(isPrivateIp(address), address).toBe(false);
+  });
+
+  it("refuses to connect when a host resolves to a private address", async () => {
+    const lookup = createGuardedLookup((_host, callback) =>
+      callback(null, [
+        { address: "93.184.216.34", family: 4 },
+        { address: "127.0.0.1", family: 4 },
+      ]),
+    );
+    const error = await new Promise<NodeJS.ErrnoException | null>((resolve) =>
+      lookup("rebind.example", { all: true }, (err) => resolve(err)),
+    );
+    expect(error?.code).toBe("EPRIVATEADDRESS");
+  });
+
+  it("passes public results through in the shape the socket asked for", async () => {
+    const lookup = createGuardedLookup((_host, callback) =>
+      callback(null, [{ address: "93.184.216.34", family: 4 }]),
+    );
+    const single = await new Promise((resolve) =>
+      lookup("example.com", {}, (_err, address, family) => resolve([address, family])),
+    );
+    expect(single).toEqual(["93.184.216.34", 4]);
+  });
+
+  it("refuses private IP literals before any connection is made", async () => {
+    for (const url of ["http://127.0.0.1/", "http://169.254.169.254/latest", "http://[::1]/", "http://[::ffff:7f00:1]/"])
+      await expect(safeFetch(url), url).rejects.toThrow(/private address/);
+  });
+
+  it("stops reading a response body at the byte limit", async () => {
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new TextEncoder().encode("a".repeat(1_000)));
+      },
+    });
+    const text = await readCapped({ body }, 2_500);
+    expect(text.length).toBe(2_500);
+    expect(pulls).toBeLessThan(10);
+  });
+});
+
+
+describe("workspace migration", () => {
+  const statements = (file: string) =>
+    readFileSync(new URL(`../../drizzle/${file}`, import.meta.url), "utf8")
+      .split("--> statement-breakpoint")
+      .map((statement) => statement.trim())
+      .filter(Boolean);
+
+  it("moves existing data into the original workspace without losing child rows", async () => {
+    const client = createClient({ url: "file::memory:" });
+    try {
+      const files = readdirSync(new URL("../../drizzle/", import.meta.url))
+        .filter((file) => file.endsWith(".sql"))
+        .sort();
+      const before = files.filter((file) => file < "0008");
+      // client.migrate runs with foreign keys off, exactly like drizzle-kit migrate.
+      for (const file of before) await client.migrate(statements(file).map((sql) => ({ sql, args: [] })));
+      await client.batch([
+        "INSERT INTO campaigns (id, name, country, city, category) VALUES ('cmp_old', 'Lagos salons', 'NG', 'Lagos', 'salon')",
+        "INSERT INTO businesses (id, campaign_id, place_id, name, category, country, city, source_url, source_discovered_at) VALUES ('biz_old', 'cmp_old', 'place_1', 'Old Salon', 'salon', 'NG', 'Lagos', 'https://maps.example', '2026-07-01')",
+        "INSERT INTO audits (id, business_id, status, score) VALUES ('aud_old', 'biz_old', 'ok', 70)",
+        "INSERT INTO contacts (id, business_id, channel, value, normalized_value, source_url, discovered_at) VALUES ('con_old', 'biz_old', 'email', 'a@b.example', 'a@b.example', 'https://b.example', '2026-07-01')",
+        "INSERT INTO ai_usage (id, business_id, model, purpose) VALUES ('ai_old', 'biz_old', 'gemini-2.5-flash', 'audit')",
+        "INSERT INTO suppressions (id, email, reason, source) VALUES ('sup_old', 'stop@b.example', 'Asked to stop', 'direct_objection')",
+      ]);
+
+      await client.migrate(statements("0008_workspaces.sql").map((sql) => ({ sql, args: [] })));
+
+      const owned = await client.execute(
+        "SELECT (SELECT workspace_id FROM campaigns WHERE id = 'cmp_old') AS campaign, (SELECT workspace_id FROM businesses WHERE id = 'biz_old') AS business, (SELECT workspace_id FROM ai_usage WHERE id = 'ai_old') AS usage, (SELECT workspace_id FROM suppressions WHERE id = 'sup_old') AS suppression",
+      );
+      expect(owned.rows[0]).toMatchObject({ campaign: "ws_legacy", business: "ws_legacy", usage: "ws_legacy", suppression: null });
+      const children = await client.execute(
+        "SELECT (SELECT count(*) FROM audits) AS audits, (SELECT count(*) FROM contacts) AS contacts, (SELECT count(*) FROM workspace_members) AS members",
+      );
+      expect(children.rows[0]).toMatchObject({ audits: 1, contacts: 1, members: 0 });
+      expect((await client.execute("PRAGMA foreign_key_check")).rows).toHaveLength(0);
+
+      // The same Google place may now exist once per workspace, but only once in each.
+      await client.execute("INSERT INTO workspaces (id, name) VALUES ('ws_other', 'Other')");
+      await client.execute(
+        "INSERT INTO businesses (id, workspace_id, campaign_id, place_id, name, category, country, city, source_url, source_discovered_at) VALUES ('biz_copy', 'ws_other', 'cmp_old', 'place_1', 'Copy', 'salon', 'NG', 'Lagos', 'u', 't')",
+      );
+      await expect(
+        client.execute(
+          "INSERT INTO businesses (id, workspace_id, campaign_id, place_id, name, category, country, city, source_url, source_discovered_at) VALUES ('biz_dupe', 'ws_other', 'cmp_old', 'place_1', 'Dupe', 'salon', 'NG', 'Lagos', 'u', 't')",
+        ),
+      ).rejects.toThrow(/UNIQUE/);
+    } finally {
+      client.close();
+    }
+  });
+});
+
+describe("daily usage counting", () => {
+  it("counts rows stamped by SQLite's CURRENT_TIMESTAMP as today", async () => {
+    const client = createClient({ url: "file::memory:" });
+    try {
+      const { rows } = await client.execute({
+        sql: "SELECT CURRENT_TIMESTAMP >= ? AS counted, CURRENT_TIMESTAMP >= ? AS old_way",
+        args: [utcDayStart(), new Date(new Date().setUTCHours(0, 0, 0, 0)).toISOString()],
+      });
+      expect(rows[0]).toMatchObject({ counted: 1, old_way: 0 });
     } finally {
       client.close();
     }

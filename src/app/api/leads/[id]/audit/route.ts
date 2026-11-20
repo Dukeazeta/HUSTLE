@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { count, eq, gte } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/db";
 import {
   aiUsage,
@@ -11,13 +11,16 @@ import {
   findings,
   opportunities,
 } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, unauthorized } from "@/lib/api";
+import { getOwnedBusiness } from "@/lib/ownership";
+import { assertDailyCap, envLimit, geminiCallsToday, recordUsage } from "@/lib/usage";
+import { requireWorkspace } from "@/lib/workspace";
 import {
   auditWebsite,
   calculateOpportunityScore,
   discoveredContactVerification,
 } from "@/lib/audit";
-import { analyzeFindings } from "@/lib/gemini";
+import { analyzeFindings, geminiModel } from "@/lib/gemini";
 import { id, normalizeDomain, normalizePhone } from "@/lib/ids";
 import {
   packageKeyFromName,
@@ -30,15 +33,15 @@ export async function POST(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const businessId = (await params).id;
-    const business = await db.query.businesses.findFirst({
-      where: eq(businesses.id, businessId),
-    });
+    const business = await getOwnedBusiness(workspace.workspaceId, businessId);
     if (!business)
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+    await assertDailyCap(workspace.workspaceId, "audit");
     const campaign = await db.query.campaigns.findFirst({
       where: eq(campaigns.id, business.campaignId),
     });
@@ -115,14 +118,8 @@ export async function POST(
     let aiUsed = false;
     let aiResult = null;
     if (result.score >= 60 && process.env.GEMINI_API_KEY) {
-      const start = new Date();
-      start.setUTCHours(0, 0, 0, 0);
-      const [usage] = await db
-        .select({ value: count() })
-        .from(aiUsage)
-        .where(gte(aiUsage.createdAt, start.toISOString()));
-      const limit = Number(process.env.GEMINI_DAILY_LIMIT ?? 30);
-      if (usage.value < limit) {
+      const limit = envLimit("GEMINI_DAILY_LIMIT", 30);
+      if ((await geminiCallsToday(workspace.workspaceId)) < limit) {
         try {
           const generated = await analyzeFindings({
             category: business.category,
@@ -135,8 +132,9 @@ export async function POST(
           aiUsed = true;
           await db.insert(aiUsage).values({
             id: id("ai"),
+            workspaceId: workspace.workspaceId,
             businessId,
-            model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+            model: geminiModel(),
             purpose: "audit",
             inputTokens: generated.usage?.promptTokenCount ?? 0,
             outputTokens: generated.usage?.candidatesTokenCount ?? 0,
@@ -248,6 +246,7 @@ export async function POST(
           .onConflictDoNothing({ target: opportunities.businessId });
       }
     });
+    await recordUsage(workspace.workspaceId, "audit");
     return NextResponse.json({
       audit: { id: auditId, ...result, summary, aiUsed },
       ai: aiResult,

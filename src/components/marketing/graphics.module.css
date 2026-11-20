@@ -1,0 +1,96 @@
+.horizon {
+  position: relative;
+  height: 340px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+
+.ribs {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.035) 0,
+    rgba(255, 255, 255, 0.035) 1px,
+    transparent 1px,
+    transparent 8px
+  );
+}
+
+.ring,
+.ringBlur,
+.disk {
+  position: absolute;
+  left: 50%;
+  top: 110px;
+  width: 1728px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% 0;
+}
+
+.ring,
+.ringBlur {
+  background: conic-gradient(
+    from 0deg,
+    #e8ecf3 0deg,
+    #2fc6c0 10deg,
+    #2953d6 60deg,
+    #2953d6 180deg,
+    #d63a2f 220deg,
+    #e2532c 300deg,
+    #f4c542 350deg,
+    #e8ecf3 360deg
+  );
+}
+
+.ringBlur {
+  filter: blur(10px);
+  opacity: 0.45;
+}
+
+.disk {
+  top: 112px;
+  width: 1724px;
+  background: radial-gradient(closest-side, #101010 97%, #141518 100%);
+}
+
+@media (max-width: 640px) {
+  .horizon {
+    height: 220px;
+  }
+
+  .ring,
+  .ringBlur {
+    top: 80px;
+    width: 1100px;
+  }
+
+  .disk {
+    top: 82px;
+    width: 1096px;
+  }
+}
+
+.funnel {
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.funnelLabels text {
+  fill: #949ba5;
+  font-family: var(--sans);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.curve {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}

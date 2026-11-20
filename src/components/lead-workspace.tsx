@@ -635,8 +635,7 @@ export function LeadWorkspace({
         <main className="stage-main">
           <div className="stage-heading">
             <div>
-              <span className="section-kicker">Lead workflow</span>
-              <h1>{WORKFLOW.find((item) => item.id === active)?.label}</h1>
+              <h2>{WORKFLOW.find((item) => item.id === active)?.label}</h2>
               <p>{stageDescription(active)}</p>
             </div>
             <div className="stage-control">

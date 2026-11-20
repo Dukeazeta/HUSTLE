@@ -1,11 +1,12 @@
 .summary {
-  min-height: 44px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 18px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-strong);
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--canvas);
   color: var(--text-muted);
   font-size: 13px;
   white-space: nowrap;

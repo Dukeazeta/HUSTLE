@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import { campaigns } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, unauthorized } from "@/lib/api";
+import { requireWorkspace } from "@/lib/workspace";
 import { CATEGORIES } from "@/lib/constants";
 import { id } from "@/lib/ids";
 import {
@@ -50,23 +51,27 @@ function defaultPricing(country: string) {
 }
 
 export async function GET() {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return NextResponse.json({ campaigns: [] });
   return NextResponse.json({
     campaigns: await db
       .select()
       .from(campaigns)
+      .where(eq(campaigns.workspaceId, workspace.workspaceId))
       .orderBy(desc(campaigns.createdAt)),
   });
 }
 
 export async function POST(request: Request) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
-    const data = inputSchema.parse(await request.json());
+    const data = await parseBody(request, inputSchema);
     const record = {
       id: id("cmp"),
+      workspaceId: workspace.workspaceId,
       ...data,
       ...defaultPricing(data.country),
       status: "active" as const,

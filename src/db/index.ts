@@ -1,9 +1,10 @@
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
+import { isDemoMode } from "@/lib/demo";
 
 export function isDatabaseConfigured() {
-  if (process.env.DEMO_MODE === "true") return false;
+  if (isDemoMode()) return false;
 
   const url = process.env.TURSO_CONNECTION_URL;
   return Boolean(

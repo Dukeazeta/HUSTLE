@@ -65,40 +65,78 @@ export const verificationTokens = sqliteTable(
   (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
 
-export const campaigns = sqliteTable("campaigns", {
+export const workspaces = sqliteTable("workspaces", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  country: text("country").notNull(),
-  city: text("city").notNull(),
-  category: text("category").notNull(),
-  currency: text("currency").notNull().default("NGN"),
-  landingPagePrice: integer("landing_page_price").notNull().default(85000),
-  completeWebsitePrice: integer("complete_website_price")
-    .notNull()
-    .default(220000),
-  bookingCataloguePrice: integer("booking_catalogue_price")
-    .notNull()
-    .default(380000),
-  complianceNote: text("compliance_note"),
-  complianceReference: text("compliance_reference"),
-  approvedChannels: text("approved_channels", { mode: "json" })
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'`),
-  complianceReviewedAt: text("compliance_reviewed_at"),
-  resultLimit: integer("result_limit").notNull().default(20),
-  budgetMinor: integer("budget_minor").notNull().default(0),
-  spentMinor: integer("spent_minor").notNull().default(0),
-  status: text("status", { enum: ["draft", "active", "paused", "complete"] })
-    .notNull()
-    .default("draft"),
   ...timestamps,
 });
+
+export const workspaceMembers = sqliteTable(
+  "workspace_members",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["owner", "member"] })
+      .notNull()
+      .default("owner"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.userId] }),
+    index("workspace_member_user_idx").on(t.userId),
+  ],
+);
+
+export const campaigns = sqliteTable(
+  "campaigns",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    country: text("country").notNull(),
+    city: text("city").notNull(),
+    category: text("category").notNull(),
+    currency: text("currency").notNull().default("NGN"),
+    landingPagePrice: integer("landing_page_price").notNull().default(85000),
+    completeWebsitePrice: integer("complete_website_price")
+      .notNull()
+      .default(220000),
+    bookingCataloguePrice: integer("booking_catalogue_price")
+      .notNull()
+      .default(380000),
+    complianceNote: text("compliance_note"),
+    complianceReference: text("compliance_reference"),
+    approvedChannels: text("approved_channels", { mode: "json" })
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'`),
+    complianceReviewedAt: text("compliance_reviewed_at"),
+    resultLimit: integer("result_limit").notNull().default(20),
+    budgetMinor: integer("budget_minor").notNull().default(0),
+    spentMinor: integer("spent_minor").notNull().default(0),
+    status: text("status", { enum: ["draft", "active", "paused", "complete"] })
+      .notNull()
+      .default("draft"),
+    ...timestamps,
+  },
+  (t) => [index("campaign_workspace_idx").on(t.workspaceId)],
+);
 
 export const businesses = sqliteTable(
   "businesses",
   {
     id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
     campaignId: text("campaign_id")
       .notNull()
       .references(() => campaigns.id, { onDelete: "cascade" }),
@@ -138,7 +176,8 @@ export const businesses = sqliteTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("business_place_unique").on(t.placeId),
+    uniqueIndex("business_workspace_place_unique").on(t.workspaceId, t.placeId),
+    index("business_workspace_idx").on(t.workspaceId),
     index("business_campaign_idx").on(t.campaignId),
     index("business_stage_idx").on(t.stage),
   ],
@@ -372,6 +411,10 @@ export const suppressions = sqliteTable(
   "suppressions",
   {
     id: text("id").primaryKey(),
+    /** Where the opt-out was recorded. Suppression checks stay global. */
+    workspaceId: text("workspace_id").references(() => workspaces.id, {
+      onDelete: "set null",
+    }),
     email: text("email"),
     phone: text("phone"),
     domain: text("domain"),
@@ -390,20 +433,51 @@ export const suppressions = sqliteTable(
   ],
 );
 
-export const aiUsage = sqliteTable("ai_usage", {
-  id: text("id").primaryKey(),
-  businessId: text("business_id").references(() => businesses.id, {
-    onDelete: "set null",
-  }),
-  model: text("model").notNull(),
-  purpose: text("purpose").notNull(),
-  inputTokens: integer("input_tokens").notNull().default(0),
-  outputTokens: integer("output_tokens").notNull().default(0),
-  estimatedCost: real("estimated_cost").notNull().default(0),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
-});
+export const aiUsage = sqliteTable(
+  "ai_usage",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    businessId: text("business_id").references(() => businesses.id, {
+      onDelete: "set null",
+    }),
+    model: text("model").notNull(),
+    purpose: text("purpose").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    estimatedCost: real("estimated_cost").notNull().default(0),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [
+    index("ai_usage_workspace_created_idx").on(t.workspaceId, t.createdAt),
+  ],
+);
+
+/** Billable actions per workspace, for daily caps now and plan quotas later. */
+export const usageEvents = sqliteTable(
+  "usage_events",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["places_search", "audit"] }).notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [
+    index("usage_event_workspace_kind_idx").on(
+      t.workspaceId,
+      t.kind,
+      t.createdAt,
+    ),
+  ],
+);
 
 export const businessRelations = relations(businesses, ({ one, many }) => ({
   campaign: one(campaigns, {

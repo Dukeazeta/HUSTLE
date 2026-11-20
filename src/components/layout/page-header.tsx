@@ -13,13 +13,11 @@ export type LeadHeaderContext = {
 };
 
 export function PageHeader({
-  eyebrow,
   title,
   description,
   actions,
   lead,
 }: {
-  eyebrow?: string;
   title: string;
   description?: string;
   actions?: ReactNode;
@@ -29,7 +27,6 @@ export function PageHeader({
     <header className={styles.header}>
       <div className={styles.primaryRow}>
         <div className={styles.copy}>
-          {eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}
           <h1>{title}</h1>
           {description && <p>{description}</p>}
         </div>

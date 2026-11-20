@@ -9,7 +9,6 @@ type DialogProps = {
   onClose: () => void;
   title: string;
   description?: string;
-  eyebrow?: string;
   children: ReactNode;
   footer?: ReactNode;
   variant?: "dialog" | "drawer";
@@ -20,7 +19,6 @@ export function Dialog({
   onClose,
   title,
   description,
-  eyebrow,
   children,
   footer,
   variant = "dialog",
@@ -98,7 +96,6 @@ export function Dialog({
       >
         <header className={styles.header}>
           <div>
-            {eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}
             <h2 id={titleId}>{title}</h2>
             {description && <p id={descriptionId}>{description}</p>}
           </div>

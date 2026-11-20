@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { and, asc, eq, gt, isNotNull, lte } from "drizzle-orm";
 import { CalendarClock } from "lucide-react";
 import { db, isDatabaseConfigured } from "@/db";
@@ -6,10 +7,13 @@ import { FollowUpQueue } from "@/components/follow-up-queue";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import styles from "./page.module.css";
+import { requireWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
 export default async function FollowUpsPage() {
+  const workspace = await requireWorkspace();
+  if (!workspace) redirect("/login");
   const configured = isDatabaseConfigured();
   const now = new Date().toISOString();
   const baseQuery = {
@@ -27,6 +31,7 @@ export default async function FollowUpsPage() {
         .innerJoin(businesses, eq(outreachDrafts.businessId, businesses.id))
         .where(
           and(
+            eq(businesses.workspaceId, workspace.workspaceId),
             eq(outreachDrafts.status, "sent"),
             eq(businesses.suppressed, false),
             isNotNull(outreachDrafts.followUpDueAt),
@@ -42,6 +47,7 @@ export default async function FollowUpsPage() {
         .innerJoin(businesses, eq(outreachDrafts.businessId, businesses.id))
         .where(
           and(
+            eq(businesses.workspaceId, workspace.workspaceId),
             eq(outreachDrafts.status, "sent"),
             eq(businesses.suppressed, false),
             isNotNull(outreachDrafts.followUpDueAt),
@@ -54,7 +60,6 @@ export default async function FollowUpsPage() {
   return (
     <AppShell active="followups">
       <PageHeader
-        eyebrow="Manual reminders"
         title="Follow-ups"
         description="Review every message yourself. HUSTLE never sends outreach automatically."
         actions={
@@ -70,7 +75,6 @@ export default async function FollowUpsPage() {
         <section aria-labelledby="due-heading">
           <div className={styles.sectionHeader}>
             <div>
-              <span>Needs attention</span>
               <h2 id="due-heading">Due now</h2>
             </div>
             <small>{due.length} reminders</small>
@@ -85,7 +89,6 @@ export default async function FollowUpsPage() {
         <section aria-labelledby="upcoming-heading">
           <div className={styles.sectionHeader}>
             <div>
-              <span>Scheduled</span>
               <h2 id="upcoming-heading">Upcoming</h2>
             </div>
             <small>{upcoming.length} reminders</small>

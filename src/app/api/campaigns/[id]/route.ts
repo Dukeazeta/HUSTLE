@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, isDatabaseConfigured } from "@/db";
 import { businesses, campaigns } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, unauthorized } from "@/lib/api";
+import { getOwnedCampaign } from "@/lib/ownership";
+import { requireWorkspace } from "@/lib/workspace";
 import { OUTREACH_CHANNELS } from "@/lib/constants";
 import {
   isCurrencyCode,
@@ -35,16 +37,14 @@ const updateSchema = z.discriminatedUnion("action", [
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, { params }: RouteContext) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
 
   try {
-    const input = updateSchema.parse(await request.json());
+    const input = await parseBody(request, updateSchema);
     const campaignId = (await params).id;
-    const campaign = await db.query.campaigns.findFirst({
-      columns: { id: true, status: true },
-      where: eq(campaigns.id, campaignId),
-    });
+    const campaign = await getOwnedCampaign(workspace.workspaceId, campaignId);
     if (!campaign)
       return NextResponse.json(
         { error: "Campaign not found" },
@@ -93,18 +93,26 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 }
 
 export async function DELETE(_: Request, { params }: RouteContext) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
 
   try {
     const campaignId = (await params).id;
+    if (!(await getOwnedCampaign(workspace.workspaceId, campaignId)))
+      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     const [leadTotal] = await db
       .select({ value: count() })
       .from(businesses)
       .where(eq(businesses.campaignId, campaignId));
     const deleted = await db
       .delete(campaigns)
-      .where(eq(campaigns.id, campaignId))
+      .where(
+        and(
+          eq(campaigns.id, campaignId),
+          eq(campaigns.workspaceId, workspace.workspaceId),
+        ),
+      )
       .returning({ id: campaigns.id });
 
     if (!deleted.length)

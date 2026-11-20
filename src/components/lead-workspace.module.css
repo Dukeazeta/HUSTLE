@@ -1,23 +1,22 @@
 .root {
-  --workspace-blue: #0052ff;
-  --workspace-blue-active: #003ecc;
-  --workspace-blue-disabled: #a8b8cc;
-  --workspace-ink: #0a0b0d;
-  --workspace-body: #5b616e;
-  --workspace-muted: #7c828a;
-  --workspace-muted-soft: #a8acb3;
+  --workspace-blue: #1f2125;
+  --workspace-blue-active: #33363c;
+  --workspace-blue-disabled: #a5a9b0;
+  --workspace-ink: #1c1d1f;
+  --workspace-body: #505967;
+  --workspace-muted: #707781;
+  --workspace-muted-soft: #949ba5;
   --workspace-canvas: #ffffff;
-  --workspace-soft: #f7f7f7;
-  --workspace-strong: #eef0f3;
-  --workspace-line: #dee1e6;
-  --workspace-line-soft: #eef0f3;
-  --workspace-danger: #cf202f;
+  --workspace-soft: #f3f4f5;
+  --workspace-strong: #eeeff1;
+  --workspace-line: #e4e7ec;
+  --workspace-line-soft: #eeeff1;
+  --workspace-danger: #c4282f;
   --workspace-warning: #f4b000;
-  --workspace-radius: 24px;
-  --workspace-input-radius: 12px;
-  --workspace-pill: 100px;
-  --workspace-mono: var(--font-geist-mono), "Geist Mono", ui-monospace,
-    SFMono-Regular, Consolas, monospace;
+  --workspace-radius: 12px;
+  --workspace-input-radius: 10px;
+  --workspace-pill: 10px;
+  --workspace-mono: var(--font-inter), Inter, Arial, sans-serif;
 
   width: 100%;
   min-width: 0;
@@ -311,22 +310,12 @@
   min-width: 0;
 }
 
-.root :global(.section-kicker) {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--workspace-blue);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.root :global(.stage-heading) h1 {
+.root :global(.stage-heading) h2 {
   margin: 0;
-  font-size: clamp(32px, 4vw, 44px);
-  font-weight: 400;
-  letter-spacing: -0.035em;
-  line-height: 1.08;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
 }
 
 .root :global(.stage-heading) p {
@@ -1047,6 +1036,7 @@
 .root :global(.pitch-variant-heading) small {
   color: var(--workspace-body);
   font-family: var(--workspace-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
 }
 
@@ -1105,6 +1095,7 @@
   padding-top: 12px;
   color: var(--workspace-body);
   font-family: var(--workspace-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   white-space: nowrap;
 }
@@ -1261,9 +1252,9 @@
 
 .root :global(.focused-stage) h2 {
   margin: 0;
-  font-size: clamp(28px, 5vw, 36px);
-  font-weight: 400;
-  letter-spacing: -0.03em;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
   line-height: 1.1;
 }
 
@@ -1314,6 +1305,7 @@
 
 .root :global(.payment-total) strong {
   font-family: var(--workspace-mono);
+  font-variant-numeric: tabular-nums;
   font-size: clamp(28px, 5vw, 38px);
   font-weight: 500;
   letter-spacing: -0.035em;
@@ -1436,6 +1428,7 @@
   min-width: 0;
   margin: 0;
   font-family: var(--workspace-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 500;
   text-align: right;
@@ -1649,6 +1642,7 @@
     background: var(--workspace-canvas);
     border-radius: var(--workspace-pill);
     font-family: var(--workspace-mono);
+  font-variant-numeric: tabular-nums;
     font-size: 11px;
     font-weight: 500;
     text-transform: capitalize;
@@ -1857,7 +1851,7 @@
 
   .root :global(.workflow-toast) {
     width: calc(100vw - 20px);
-    border-radius: 20px;
+    border-radius: var(--radius-xl);
   }
 }
 

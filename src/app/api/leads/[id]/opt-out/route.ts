@@ -9,7 +9,9 @@ import {
   outreachDrafts,
   suppressions,
 } from "@/db/schema";
-import { apiError, notConfigured, requireUser, unauthorized } from "@/lib/api";
+import { apiError, notConfigured, parseBody, unauthorized } from "@/lib/api";
+import { getOwnedBusiness } from "@/lib/ownership";
+import { requireWorkspace } from "@/lib/workspace";
 import { id } from "@/lib/ids";
 
 const inputSchema = z.object({
@@ -23,16 +25,13 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await requireUser())) return unauthorized();
+  const workspace = await requireWorkspace();
+  if (!workspace) return unauthorized();
   if (!isDatabaseConfigured()) return notConfigured("Turso");
   try {
     const businessId = (await params).id;
-    const { reason } = inputSchema.parse(
-      await request.json().catch(() => ({})),
-    );
-    const business = await db.query.businesses.findFirst({
-      where: eq(businesses.id, businessId),
-    });
+    const { reason } = await parseBody(request, inputSchema, {});
+    const business = await getOwnedBusiness(workspace.workspaceId, businessId);
     if (!business)
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     const socialProfiles = await db
@@ -44,6 +43,7 @@ export async function POST(
       await tx.insert(suppressions).values([
         {
           id: id("sup"),
+          workspaceId: workspace.workspaceId,
           email: business.email,
           phone: business.phone,
           domain: business.normalizedDomain,
@@ -52,6 +52,7 @@ export async function POST(
         },
         ...socialProfiles.map((profile) => ({
           id: id("sup"),
+          workspaceId: workspace.workspaceId,
           profileUrl: profile.normalizedUrl,
           reason,
           source: "direct_objection",
